@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Guesthouse Bookings</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--bg:#0F1419;--surface:#1A2230;--surface2:#243040;--border:#2D3E50;--accent:#C8A96E;--accent2:#E8C98E;--room:#4A90D9;--camp:#4CAF7D;--text:#E8EDF2;--muted:#8A9BB0;--danger:#E05555;--warn:#E8A838;--success:#4CAF7D;--radius:12px}
+html,body{height:100%;overflow:hidden;background:var(--bg)}
+body{font-family:'DM Sans',sans-serif;color:var(--text)}
+.app{max-width:480px;margin:0 auto;height:100dvh;display:flex;flex-direction:column;background:var(--bg)}
+.app-header{background:linear-gradient(135deg,#1A2230,#0F1419);border-bottom:1px solid var(--border);padding:14px 20px 12px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.app-title{font-family:'Playfair Display',serif;font-size:18px;color:var(--accent)}
+.app-subtitle{font-size:11px;color:var(--muted);margin-top:1px}
+.menu-btn{background:var(--accent);color:var(--bg);border:none;border-radius:8px;padding:8px 16px;font-size:14px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif}
+.content{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+.tab{display:none}.tab.active{display:block}
+.cal-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 8px}
+.cal-month-title{font-family:'Playfair Display',serif;font-size:20px;color:var(--accent)}
+.icon-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:16px;line-height:1;font-family:'DM Sans',sans-serif}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);padding:0 8px}
+.cal-day-label{text-align:center;font-size:10px;color:var(--muted);padding:6px 0;font-weight:600;text-transform:uppercase;letter-spacing:0.5px}
+.cal-cell{aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:4px 2px 2px;cursor:pointer;border-radius:8px;min-height:44px}
+.cal-cell.other-month .cal-date{color:var(--border)}
+.cal-date{font-size:13px;font-weight:500;margin-bottom:2px}
+.cal-dots{display:flex;flex-wrap:wrap;gap:2px;justify-content:center}
+.cal-dot{width:6px;height:6px;border-radius:50%}
+.cal-dot.room{background:var(--room)}.cal-dot.camp{background:var(--camp)}
+.cal-legend{display:flex;gap:16px;padding:8px 20px 16px;justify-content:center}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.legend-dot{width:10px;height:10px;border-radius:50%}
+.avail-header{padding:16px 20px 8px;display:flex;align-items:center;gap:12px}
+.date-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:10px 14px;font-family:'DM Sans',sans-serif;font-size:14px;outline:none}
+.date-input:focus{border-color:var(--accent)}
+.section-title{font-family:'Playfair Display',serif;font-size:13px;color:var(--accent);text-transform:uppercase;letter-spacing:1.5px;padding:12px 20px 6px}
+.unit-row{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);cursor:pointer}
+.unit-name{font-size:14px;font-weight:500}
+.unit-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.status-badge{border-radius:20px;padding:4px 12px;font-size:11px;font-weight:600;white-space:nowrap}
+.status-available{background:rgba(76,175,125,0.15);color:var(--success);border:1px solid rgba(76,175,125,0.3)}
+.status-booked{background:rgba(224,85,85,0.15);color:var(--danger);border:1px solid rgba(224,85,85,0.3)}
+.status-arriving{background:rgba(74,144,217,0.15);color:var(--room);border:1px solid rgba(74,144,217,0.3)}
+.status-departing{background:rgba(232,168,56,0.15);color:var(--warn);border:1px solid rgba(232,168,56,0.3)}
+.status-arriving-departing{background:rgba(195,116,232,0.15);color:#C374E8;border:1px solid rgba(195,116,232,0.3)}
+.form-wrap{padding:16px 20px 120px}
+.form-section-title{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:20px 0 10px;display:flex;align-items:center;gap:8px}
+.form-section-title::after{content:'';flex:1;height:1px;background:var(--border)}
+.form-group{margin-bottom:14px}
+.form-label{font-size:12px;color:var(--muted);margin-bottom:5px;display:block}
+.form-input,.form-select,.form-textarea{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:11px 14px;font-family:'DM Sans',sans-serif;font-size:14px;outline:none;-webkit-appearance:none}
+.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--accent)}
+.form-select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%238A9BB0' d='M6 8L0 0h12z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px}
+.form-textarea{resize:vertical;min-height:80px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px}
+.toggle-label{font-size:14px}
+.toggle{width:44px;height:24px;background:var(--border);border-radius:12px;position:relative;cursor:pointer;transition:background 0.2s;border:none;flex-shrink:0}
+.toggle.on{background:var(--accent)}
+.toggle::after{content:'';position:absolute;width:18px;height:18px;background:white;border-radius:50%;top:3px;left:3px;transition:transform 0.2s;box-shadow:0 1px 4px rgba(0,0,0,0.3)}
+.toggle.on::after{transform:translateX(20px)}
+.save-btn{width:100%;background:linear-gradient(135deg,var(--accent),var(--accent2));color:var(--bg);border:none;border-radius:12px;padding:15px;font-family:'Playfair Display',serif;font-size:16px;font-weight:700;cursor:pointer;margin-top:20px;box-shadow:0 4px 16px rgba(200,169,110,0.3)}
+.error-msg{background:rgba(224,85,85,0.15);border:1px solid rgba(224,85,85,0.4);border-radius:10px;padding:12px 14px;color:var(--danger);font-size:13px;margin-top:12px}
+.balance-hint{background:rgba(232,168,56,0.1);border:1px solid rgba(232,168,56,0.3);border-radius:10px;padding:10px 14px;margin-bottom:10px;display:flex;justify-content:space-between;font-size:13px}
+.search-bar{padding:12px 20px}
+.search-input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:10px 14px;font-family:'DM Sans',sans-serif;font-size:14px;outline:none}
+.filter-row{display:flex;gap:8px;padding:0 20px 12px;overflow-x:auto;scrollbar-width:none}
+.filter-row::-webkit-scrollbar{display:none}
+.filter-chip{background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:5px 12px;font-size:12px;color:var(--muted);cursor:pointer;white-space:nowrap;font-family:'DM Sans',sans-serif;flex-shrink:0}
+.filter-chip.active{background:var(--accent);border-color:var(--accent);color:var(--bg);font-weight:600}
+.booking-card{margin:0 16px 10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;cursor:pointer;position:relative;overflow:hidden}
+.booking-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px}
+.booking-card.room::before{background:var(--room)}.booking-card.camp::before{background:var(--camp)}
+.booking-card-top{display:flex;justify-content:space-between;align-items:flex-start}
+.booking-guest{font-size:15px;font-weight:600}
+.booking-unit{font-size:12px;color:var(--muted);margin-top:2px}
+.booking-dates{font-size:12px;color:var(--muted);margin-top:6px}
+.pay-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.pay-full{background:var(--success)}.pay-deposit{background:var(--warn)}.pay-none{background:var(--danger)}
+.nights-badge{background:var(--surface2);border-radius:6px;padding:2px 8px;font-size:11px;color:var(--muted);margin-left:8px}
+.owes-card{margin:0 16px 10px;border-radius:var(--radius);padding:14px 16px;cursor:pointer;position:relative;overflow:hidden}
+.owes-card.owe-none{background:var(--surface);border:1px solid rgba(224,85,85,0.3)}
+.owes-card.owe-none::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--danger)}
+.owes-card.owe-deposit{background:var(--surface);border:1px solid rgba(232,168,56,0.3)}
+.owes-card.owe-deposit::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--warn)}
+.owe-amount{font-size:17px;font-weight:700;color:var(--danger)}
+.owe-amount.partial{color:var(--warn)}
+.owe-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:flex-end;justify-content:center;z-index:100}
+.modal-sheet{background:var(--surface);border-radius:20px 20px 0 0;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;padding:20px;border-top:1px solid var(--border)}
+.modal-handle{width:40px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px}
+.modal-title{font-family:'Playfair Display',serif;font-size:20px;color:var(--accent);margin-bottom:4px}
+.modal-unit{font-size:13px;color:var(--muted);margin-bottom:16px}
+.detail-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px}
+.detail-row:last-child{border-bottom:none}
+.detail-key{color:var(--muted)}
+.detail-val{font-weight:500;text-align:right;max-width:65%;word-break:break-word}
+.modal-actions{display:flex;gap:10px;margin-top:16px}
+.btn-edit{flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:12px;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer}
+.btn-delete{flex:1;background:rgba(224,85,85,0.15);border:1px solid rgba(224,85,85,0.3);color:var(--danger);border-radius:10px;padding:12px;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer}
+.empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
+.dash-wrap{padding:16px 20px 80px}
+.dash-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px}
+.month-nav{display:flex;align-items:center;gap:6px}
+.month-nav-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center}
+.month-label{font-size:13px;font-weight:600;color:var(--accent);min-width:86px;text-align:center}
+.all-time-btn{font-size:11px;color:var(--muted);cursor:pointer;text-decoration:underline;background:none;border:none;font-family:'DM Sans',sans-serif;padding:0;margin-left:4px}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+.stat-value{font-family:'Playfair Display',serif;font-size:28px;color:var(--accent);line-height:1}
+.stat-label{font-size:11px;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:0.5px}
+.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.bar-name{font-size:12px;width:120px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-track{flex:1;background:var(--surface2);border-radius:4px;height:8px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+.bar-count{font-size:11px;color:var(--muted);width:30px;text-align:right;flex-shrink:0}
+.owes-header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px 6px}
+.menu-modal{background:var(--surface);border-radius:20px 20px 0 0;width:100%;max-width:480px;padding:20px 0 40px;border-top:1px solid var(--border);max-height:90vh;overflow-y:auto}
+.menu-nav-item{display:block;width:100%;background:none;border:none;border-bottom:1px solid var(--border);color:var(--text);font-family:'DM Sans',sans-serif;font-size:16px;padding:16px 20px;text-align:left;cursor:pointer}
+.menu-nav-item:last-child{border-bottom:none}
+.menu-section-label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:1px;padding:16px 20px 8px}
+.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--accent);border-radius:24px;padding:10px 20px;font-size:13px;color:var(--accent);z-index:200;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,0.4)}
+.hidden{display:none}
+.pensioner-badge{background:rgba(232,168,56,0.2);border:1px solid rgba(232,168,56,0.5);border-radius:6px;padding:2px 8px;font-size:10px;color:var(--warn);margin-left:6px}
+.intl-badge{background:rgba(74,144,217,0.2);border:1px solid rgba(74,144,217,0.4);border-radius:6px;padding:2px 8px;font-size:10px;color:var(--room);margin-left:6px}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="app-header">
+    <div>
+      <div class="app-title">The Guesthouse</div>
+      <div class="app-subtitle" id="current-tab-label">Calendar</div>
+    </div>
+    <button class="menu-btn" onclick="openMenu()">&#9776; NAV / MENU</button>
+  </header>
+
+  <div class="content">
+    <div id="tab-calendar" class="tab active">
+      <div class="cal-header">
+        <button class="icon-btn" onclick="calPrev()">&#8249;</button>
+        <span class="cal-month-title" id="cal-title"></span>
+        <button class="icon-btn" onclick="calNext()">&#8250;</button>
+      </div>
+      <div class="cal-grid" id="cal-grid"></div>
+      <div class="cal-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--room)"></div>Rooms</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--camp)"></div>Campsites</div>
+      </div>
+    </div>
+
+    <div id="tab-availability" class="tab">
+      <div class="avail-header">
+        <label style="font-size:13px;color:var(--muted);flex-shrink:0">Date</label>
+        <input type="date" class="date-input" id="avail-date" onchange="renderAvailability()">
+        <button class="icon-btn" onclick="document.getElementById('avail-date').value=todayStr();renderAvailability()">Today</button>
+      </div>
+      <div id="avail-content"></div>
+    </div>
+
+    <div id="tab-new" class="tab">
+      <div class="form-wrap" id="booking-form-wrap"></div>
+    </div>
+
+    <div id="tab-bookings" class="tab">
+      <div class="search-bar">
+        <input class="search-input" id="list-search" placeholder="Search guest, phone, unit..." oninput="renderBookingsList()">
+      </div>
+      <div class="filter-row" id="list-filters"></div>
+      <div id="bookings-list"></div>
+    </div>
+
+    <div id="tab-dashboard" class="tab">
+      <div id="dash-content"></div>
+    </div>
+
+    <div id="tab-owed" class="tab">
+      <div id="owed-content"></div>
+    </div>
+
+    <div id="tab-guests" class="tab">
+      <div id="guests-content"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Booking modal -->
+<div id="modal-overlay" class="modal-overlay hidden" onclick="closeModal()">
+  <div id="modal-sheet" class="modal-sheet" onclick="event.stopPropagation()"></div>
+</div>
+
+<!-- Menu modal -->
+<div id="menu-overlay" class="modal-overlay hidden" onclick="closeMenu()">
+  <div class="menu-modal" onclick="event.stopPropagation()">
+    <div class="modal-handle"></div>
+    <div style="font-family:'Playfair Display',serif;font-size:20px;color:var(--accent);padding:0 20px 12px">The Guesthouse</div>
+
+    <div class="menu-section-label">Navigate</div>
+    <div style="background:var(--surface2);border-radius:12px;margin:0 16px 16px;overflow:hidden">
+      <button class="menu-nav-item" onclick="closeMenu();switchTab('calendar')">&#128197; Calendar</button>
+      <button class="menu-nav-item" onclick="closeMenu();switchTab('availability')">&#128716; Availability</button>
+      <button class="menu-nav-item" onclick="closeMenu();switchTab('new')">&#10133; New Booking</button>
+      <button class="menu-nav-item" onclick="closeMenu();switchTab('bookings')">&#128203; All Bookings</button>
+      <button class="menu-nav-item" onclick="closeMenu();switchTab('dashboard')">&#128202; Dashboard</button>
+      <button class="menu-nav-item" onclick="closeMenu();switchTab('owed')">&#128184; Money Owed</button>
+      <button class="menu-nav-item" style="border-bottom:none" onclick="closeMenu();switchTab('guests')">&#127881; Guest Analytics</button>
+    </div>
+
+    <div class="menu-section-label">Backup &amp; Restore</div>
+    <div id="menu-backup-count" style="font-size:12px;color:var(--muted);padding:0 20px 12px"></div>
+    <div style="margin:0 16px 10px;background:rgba(76,175,125,0.1);border:1px solid rgba(76,175,125,0.4);border-radius:12px;padding:14px 16px;cursor:pointer" onclick="handleExportXLSX()">
+      <div style="font-weight:600;color:var(--success);font-size:14px">&#128202; Download Excel backup</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px">All bookings as a spreadsheet.</div>
+    </div>
+    <div style="margin:0 16px 10px;background:rgba(74,144,217,0.1);border:1px solid rgba(74,144,217,0.3);border-radius:12px;padding:14px 16px;cursor:pointer" onclick="triggerImport()">
+      <div style="font-weight:600;color:var(--room);font-size:14px">&#11014;&#65039; Import from Excel backup</div>
+    </div>
+    <div style="margin:0 16px 10px;background:rgba(200,169,110,0.1);border:1px solid rgba(200,169,110,0.4);border-radius:12px;padding:14px 16px;cursor:pointer" onclick="copyAllData()">
+      <div style="font-weight:600;color:var(--accent);font-size:14px">&#128203; Copy all data to clipboard</div>
+    </div>
+    <div style="margin:0 16px 10px;background:rgba(195,116,232,0.1);border:1px solid rgba(195,116,232,0.3);border-radius:12px;padding:14px 16px;cursor:pointer" onclick="closeMenu();openBirthdayExport()">
+      <div style="font-weight:600;color:#C374E8;font-size:14px">&#127874; Download Birthday Guest List</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px">Past guests with birthdays in a selected month.</div>
+    </div>
+    <div id="copy-result" style="display:none;margin:0 16px 10px;background:rgba(76,175,125,0.15);border:1px solid rgba(76,175,125,0.3);border-radius:10px;padding:10px 14px;color:var(--success);font-size:13px"></div>
+    <div id="import-error" style="display:none;margin:0 16px;background:rgba(224,85,85,0.15);border:1px solid rgba(224,85,85,0.4);border-radius:10px;padding:10px 14px;color:var(--danger);font-size:13px"></div>
+    <input type="file" id="import-file-input" accept=".xlsx" style="display:none" onchange="handleImportXLSX(this)">
+  </div>
+</div>
+
+<!-- Birthday export modal -->
+<div id="bday-overlay" class="modal-overlay hidden" onclick="document.getElementById('bday-overlay').classList.add('hidden')">
+  <div class="modal-sheet" style="padding:24px 20px 32px" onclick="event.stopPropagation()">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Birthday Guest List</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:16px">Select a month to download guests with birthdays in that month.</div>
+    <div class="form-group">
+      <label class="form-label">Month</label>
+      <select class="form-select" id="bday-month">
+        <option value="1">January</option><option value="2">February</option><option value="3">March</option>
+        <option value="4">April</option><option value="5">May</option><option value="6">June</option>
+        <option value="7">July</option><option value="8">August</option><option value="9">September</option>
+        <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+      </select>
+    </div>
+    <button class="save-btn" onclick="downloadBirthdayList()">&#11015;&#65039; Download Excel</button>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script>
+const ROOMS=[{id:'r1',name:'1 Standard Twin',type:'room'},{id:'r2',name:'2 Deluxe Double',type:'room'},{id:'r3',name:'3 Deluxe Twin',type:'room'},{id:'r4',name:'4 Classic Twin \u267F',type:'room'},{id:'r5',name:'5 Wakkerstroom Villager',type:'room'}];
+const CAMPS=[{id:'c1',name:'Blue',type:'camp'},{id:'c2',name:'Yellow',type:'camp'},{id:'c3',name:'Green',type:'camp'},{id:'c4',name:'Red \u267F',type:'camp'},{id:'c5',name:'BYO 1',type:'camp'},{id:'c6',name:'BYO 2',type:'camp'}];
+const ALL_UNITS=[...ROOMS,...CAMPS];
+const DEFAULT_SOURCES=['Direct','WhatsApp','Booking.com','Airbnb','Lekkeslaap','Other'];
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const MONTHS_SHORT=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const DAYS_SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const SA_PROVINCES=['Eastern Cape','Free State','Gauteng','KwaZulu-Natal','Limpopo','Mpumalanga','Northern Cape','North West','Western Cape'];
+const STORAGE_KEY='guesthouse_bookings_v3';
+
+let bookings=[],currentTab='calendar',calYear,calMonth,availDate,listFilter='all',formData={},dashMode='month',dashMonth,dashYear,oweFilter='all';
+
+function todayStr(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
+function parseDate(s){return s?new Date(s+'T00:00:00'):null}
+function diffDays(a,b){return Math.round((parseDate(b)-parseDate(a))/86400000)}
+function addDays(s,n){const d=parseDate(s);d.setDate(d.getDate()+n);return d.toISOString().split('T')[0]}
+function isBetween(date,ci,co){return date>=ci&&date<co}
+function genId(){return Math.random().toString(36).slice(2,10)}
+function fmtR(v){return v>=1000?'R'+(v/1000).toFixed(1)+'k':'R'+Math.round(v)}
+function unitById(id){return ALL_UNITS.find(u=>u.id===id)}
+function payStatus(b){if(b.paidInFull)return 'full';if(b.depositPaid)return 'deposit';return 'none'}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function getAllSources(){const s=new Set(DEFAULT_SOURCES);bookings.forEach(b=>{if(b.source)s.add(b.source)});return[...s]}
+
+function isPensioner(b){
+  if(b.pensioner)return true;
+  if(b.idNumber&&b.idNumber.length>=6){
+    const yr=parseInt(b.idNumber.slice(0,2));
+    const mo=parseInt(b.idNumber.slice(2,4));
+    const dy=parseInt(b.idNumber.slice(4,6));
+    if(isNaN(yr)||isNaN(mo)||isNaN(dy))return false;
+    const fullYr=yr<=new Date().getFullYear()-2000?2000+yr:1900+yr;
+    const age=new Date().getFullYear()-fullYr;
+    return age>=60;
+  }
+  return false;
+}
+function isInternational(b){return b.origin&&b.origin!=='South Africa'&&!SA_PROVINCES.includes(b.origin)}
+function getBirthday(b){
+  if(b.idNumber&&b.idNumber.length>=6){
+    const yr=parseInt(b.idNumber.slice(0,2));
+    const mo=b.idNumber.slice(2,4);
+    const dy=b.idNumber.slice(4,6);
+    const fullYr=yr<=new Date().getFullYear()-2000?2000+yr:1900+yr;
+    return `${fullYr}-${mo}-${dy}`;
+  }
+  return b.birthday||'';
+}
+
+function getUnitStatus(unitId,date){
+  let arriving=null,departing=null,booked=null;
+  for(const b of bookings){
+    if(b.unitId!==unitId)continue;
+    if(date===b.checkIn)arriving=b;
+    else if(date===b.checkOut)departing=b;
+    else if(isBetween(date,b.checkIn,b.checkOut))booked=b;
+  }
+  if(arriving&&departing)return{status:'arriving-departing',booking:arriving,departing};
+  if(arriving)return{status:'arriving',booking:arriving,departing:null};
+  if(departing)return{status:'departing',booking:departing,departing:null};
+  if(booked)return{status:'booked',booking:booked,departing:null};
+  return{status:'available',booking:null,departing:null};
+}
+
+function isUnitAvailable(unitId,checkIn,checkOut,excludeId){
+  return !bookings.some(b=>{
+    if(b.unitId!==unitId)return false;
+    if(excludeId&&b.id===excludeId)return false;
+    return checkIn<b.checkOut&&checkOut>b.checkIn;
+  });
+}
+
+function saveBookings(){localStorage.setItem(STORAGE_KEY,JSON.stringify(bookings))}
+function loadBookings(){try{const s=localStorage.getItem(STORAGE_KEY);if(s)bookings=JSON.parse(s)}catch{}}
+
+let toastTimer;
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.remove('hidden');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.add('hidden'),2800)}
+
+function openMenu(){
+  document.getElementById('menu-backup-count').textContent=bookings.length+' bookings stored on this device';
+  document.getElementById('import-error').style.display='none';
+  document.getElementById('copy-result').style.display='none';
+  document.getElementById('menu-overlay').classList.remove('hidden');
+}
+function closeMenu(){document.getElementById('menu-overlay').classList.add('hidden')}
+
+function switchTab(tab){
+  ['calendar','availability','new','bookings','dashboard','owed','guests'].forEach(t=>{
+    const el=document.getElementById('tab-'+t);
+    if(el)el.style.display=t===tab?'block':'none';
+  });
+  const labels={calendar:'Calendar',availability:'Availability',new:'New Booking',bookings:'All Bookings',dashboard:'Dashboard',owed:'Money Owed',guests:'Guest Analytics'};
+  const lbl=document.getElementById('current-tab-label');
+  if(lbl)lbl.textContent=labels[tab]||'';
+  currentTab=tab;
+  if(tab==='calendar')renderCalendar();
+  if(tab==='availability'){document.getElementById('avail-date').value=availDate;renderAvailability();}
+  if(tab==='new')renderForm();
+  if(tab==='bookings')renderBookingsList();
+  if(tab==='dashboard')renderDashboard();
+  if(tab==='owed')renderOwed();
+  if(tab==='guests')renderGuests();
+}
+
+function calPrev(){calMonth--;if(calMonth<0){calMonth=11;calYear--;}renderCalendar()}
+function calNext(){calMonth++;if(calMonth>11){calMonth=0;calYear++;}renderCalendar()}
+
+function renderCalendar(){
+  document.getElementById('cal-title').textContent=MONTHS[calMonth]+' '+calYear;
+  const grid=document.getElementById('cal-grid');
+  let html=DAYS_SHORT.map(d=>`<div class="cal-day-label">${d}</div>`).join('');
+  const firstDay=new Date(calYear,calMonth,1).getDay();
+  const daysInMonth=new Date(calYear,calMonth+1,0).getDate();
+  const prevDays=new Date(calYear,calMonth,0).getDate();
+  const cells=[];
+  for(let i=firstDay-1;i>=0;i--){
+    const y=calMonth===0?calYear-1:calYear;
+    const m=calMonth===0?11:calMonth-1;
+    const d=new Date(y,m,prevDays-i);
+    cells.push({day:prevDays-i,thisMonth:false,dateStr:`${y}-${String(m+1).padStart(2,'0')}-${String(prevDays-i).padStart(2,'0')}`});
+  }
+  for(let d=1;d<=daysInMonth;d++){
+    cells.push({day:d,thisMonth:true,dateStr:`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`});
+  }
+  while(cells.length%7!==0)cells.push({day:'',thisMonth:false,dateStr:''});
+  cells.forEach(cell=>{
+    let dots='';
+    if(cell.thisMonth&&cell.dateStr){
+      let rooms=0,camps=0;
+      bookings.forEach(b=>{
+        if(!b.checkIn||!b.checkOut)return;
+        if(cell.dateStr>=b.checkIn&&cell.dateStr<b.checkOut){
+          const u=unitById(b.unitId);
+          if(u?.type==='room')rooms++;else if(u?.type==='camp')camps++;
+        }
+      });
+      for(let r=0;r<Math.min(rooms,3);r++)dots+=`<div class="cal-dot room"></div>`;
+      for(let c=0;c<Math.min(camps,3);c++)dots+=`<div class="cal-dot camp"></div>`;
+    }
+    const cls=`cal-cell${!cell.thisMonth?' other-month':''}`;
+    const click=cell.thisMonth&&cell.dateStr?`onclick="calCellClick('${cell.dateStr}')"`:'' ;
+    html+=`<div class="${cls}" ${click}><div class="cal-date">${cell.day||''}</div><div class="cal-dots">${dots}</div></div>`;
+  });
+  grid.innerHTML=html;
+}
+
+function calCellClick(dateStr){
+  const bks=bookings.filter(b=>b.checkIn&&b.checkOut&&(isBetween(dateStr,b.checkIn,b.checkOut)||dateStr===b.checkIn));
+  if(!bks.length)return;
+  if(bks.length===1){openBookingModal(bks[0]);return;}
+  let html=`<div class="modal-handle"></div><div class="modal-title">${dateStr}</div><div class="modal-unit" style="margin-bottom:12px">${bks.length} bookings</div>`;
+  bks.forEach(b=>{const u=unitById(b.unitId);const ps=payStatus(b);html+=`<div class="booking-card ${u?.type||'room'}" style="margin:0 0 8px" onclick="closeModal();openBookingModal(bookings.find(x=>x.id==='${b.id}'))"><div class="booking-card-top"><div><div class="booking-guest">${esc(b.firstName)} ${esc(b.lastName)}</div><div class="booking-unit">${esc(u?.name||'')}</div></div><div class="pay-dot pay-${ps}"></div></div></div>`;});
+  showModal(html);
+}
+
+function renderAvailability(){
+  availDate=document.getElementById('avail-date').value||todayStr();
+  const statusLabel={available:'&#9989; Available',booked:'&#10060; Booked',arriving:'&#128246; Arriving',departing:'&#129000; Departing','arriving-departing':'&#128260; Arr/Dep'};
+  const statusClass={available:'status-available',booked:'status-booked',arriving:'status-arriving',departing:'status-departing','arriving-departing':'status-arriving-departing'};
+  let html='<div class="section-title">Rooms</div>';
+  [...ROOMS,...CAMPS].forEach((unit,i)=>{
+    if(i===ROOMS.length)html+='<div class="section-title">Campsites</div>';
+    const result=getUnitStatus(unit.id,availDate);
+    const{status,booking:bk,departing:dep}=result;
+    const click=bk?`onclick="openBookingModal(bookings.find(x=>x.id==='${bk.id}'))"`:'' ;
+    let sub='';
+    if(status==='arriving-departing'&&dep)sub=`<div class="unit-sub">&#11014; ${esc(dep.firstName)} ${esc(dep.lastName)} &nbsp;&#11015; ${esc(bk.firstName)} ${esc(bk.lastName)}</div>`;
+    else if(bk)sub=`<div class="unit-sub">${esc(bk.firstName)} ${esc(bk.lastName)}</div>`;
+    html+=`<div class="unit-row" ${click}><div><div class="unit-name">${esc(unit.name)}</div>${sub}</div><div class="status-badge ${statusClass[status]}">${statusLabel[status]}</div></div>`;
+  });
+  html+='<div style="height:40px"></div>';
+  document.getElementById('avail-content').innerHTML=html;
+}
+
+function renderForm(){
+  if(!formData.checkIn)formData.checkIn=todayStr();
+  if(!formData.checkOut)formData.checkOut=addDays(formData.checkIn,1);
+  const isEdit=!!formData.id;
+  const nights=formData.checkIn&&formData.checkOut?Math.max(0,diffDays(formData.checkIn,formData.checkOut)):0;
+
+  // Build unit options — only available units for selected dates (or all if editing same booking)
+  let unitOpts=`<option value="">&#8212; Select unit &#8212;</option>`;
+  const roomOpts=ROOMS.map(r=>{
+    const avail=!formData.checkIn||!formData.checkOut||isUnitAvailable(r.id,formData.checkIn,formData.checkOut,formData.id);
+    return `<option value="${r.id}"${formData.unitId===r.id?' selected':''}${!avail?' disabled':''}>&#${avail?'9989':'10060'}; ${esc(r.name)}${!avail?' (booked)':''}</option>`;
+  }).join('');
+  const campOpts=CAMPS.map(c=>{
+    const avail=!formData.checkIn||!formData.checkOut||isUnitAvailable(c.id,formData.checkIn,formData.checkOut,formData.id);
+    return `<option value="${c.id}"${formData.unitId===c.id?' selected':''}${!avail?' disabled':''}>&#${avail?'9989':'10060'}; ${esc(c.name)}${!avail?' (booked)':''}</option>`;
+  }).join('');
+  unitOpts+=`<optgroup label="Rooms">${roomOpts}</optgroup><optgroup label="Campsites">${campOpts}</optgroup>`;
+
+  const balHint=formData.depositPaid&&formData.depositAmount&&formData.totalPrice&&parseFloat(formData.totalPrice)>0?`<div class="balance-hint"><span style="color:var(--muted)">Balance still owing</span><span style="font-weight:700;color:var(--warn)">R${Math.max(0,parseFloat(formData.totalPrice)-parseFloat(formData.depositAmount||0)).toLocaleString()}</span></div>`:'';
+
+  const sourceOpts=getAllSources().map(s=>`<option value="${esc(s)}"${formData.source===s?' selected':''}>${esc(s)}</option>`).join('');
+
+  // Origin options
+  const originOpts=['South Africa',...SA_PROVINCES,'International - Other'].map(o=>`<option value="${esc(o)}"${formData.origin===o?' selected':''}>${esc(o)}</option>`).join('');
+
+  let html=`
+    <div style="font-family:'Playfair Display',serif;font-size:22px;color:var(--accent);margin-bottom:4px">${isEdit?'Edit Booking':'New Booking'}</div>
+    ${nights>0?`<div style="font-size:12px;color:var(--muted);margin-bottom:4px">${nights} night${nights!==1?'s':''}</div>`:''}
+    <div class="form-section-title">Guest Details</div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">First Name *</label><input class="form-input" id="f-firstName" value="${esc(formData.firstName||'')}" placeholder="Jane" oninput="formData.firstName=this.value"></div>
+      <div class="form-group"><label class="form-label">Surname</label><input class="form-input" id="f-lastName" value="${esc(formData.lastName||'')}" placeholder="Smith" oninput="formData.lastName=this.value"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Phone</label><input class="form-input" type="tel" value="${esc(formData.phone||'')}" placeholder="+27 82 000 0000" oninput="formData.phone=this.value"></div>
+    <div class="form-group"><label class="form-label">Email</label><input class="form-input" type="email" value="${esc(formData.email||'')}" placeholder="jane@email.com" oninput="formData.email=this.value"></div>
+    <div class="form-group"><label class="form-label">ID Number (optional)</label><input class="form-input" type="text" inputmode="numeric" value="${esc(formData.idNumber||'')}" placeholder="SA ID or passport number" oninput="formData.idNumber=this.value"></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Province / Country</label><select class="form-select" onchange="formData.origin=this.value"><option value="">&#8212; Select &#8212;</option>${originOpts}</select></div>
+      <div class="form-group"><label class="form-label">Pensioner</label><div class="toggle-row" style="margin:0"><span class="toggle-label" style="font-size:13px">&#129438; Pensioner</span><button class="toggle${formData.pensioner?' on':''}" onclick="formData.pensioner=!formData.pensioner;renderForm()"></button></div></div>
+    </div>
+    <div class="form-section-title">Booking Info</div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Check-in *</label><input class="form-input" type="date" value="${formData.checkIn||''}" onchange="formData.checkIn=this.value;if(!formData.checkOut||formData.checkOut<=formData.checkIn)formData.checkOut=addDays(formData.checkIn,1);renderForm()"></div>
+      <div class="form-group"><label class="form-label">Check-out *</label><input class="form-input" type="date" value="${formData.checkOut||''}" min="${formData.checkIn||''}" onchange="formData.checkOut=this.value;renderForm()"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Unit * ${formData.checkIn&&formData.checkOut?'<span style="color:var(--success);font-size:11px">(showing availability)</span>':''}</label><select class="form-select" onchange="formData.unitId=this.value">${unitOpts}</select></div>
+    <div class="form-group"><label class="form-label">Booking Source</label>
+      <select class="form-select" onchange="formData.source=this.value">
+        <option value="">&#8212; Select source &#8212;</option>${sourceOpts}
+        <option value="_custom">+ Add custom source...</option>
+      </select>
+    </div>
+    <div class="form-section-title">Financial</div>
+    <div class="form-group"><label class="form-label">Total Price (R)</label><input class="form-input" type="text" inputmode="decimal" value="${esc(formData.totalPrice||'')}" placeholder="0.00" oninput="formData.totalPrice=this.value;renderForm()"></div>
+    <div class="toggle-row"><span class="toggle-label">Deposit Paid</span><button class="toggle${formData.depositPaid?' on':''}" onclick="formData.depositPaid=!formData.depositPaid;renderForm()"></button></div>
+    ${formData.depositPaid?`<div class="form-row">
+      <div class="form-group"><label class="form-label">Deposit Amount (R)</label><input class="form-input" type="text" inputmode="decimal" value="${esc(formData.depositAmount||'')}" placeholder="0.00" oninput="formData.depositAmount=this.value;renderForm()"></div>
+      <div class="form-group"><label class="form-label">Deposit Date</label><input class="form-input" type="date" value="${esc(formData.depositDate||'')}" onchange="formData.depositDate=this.value"></div>
+    </div>${balHint}`:''}
+    <div class="toggle-row"><span class="toggle-label">Paid in Full</span><button class="toggle${formData.paidInFull?' on':''}" onclick="formData.paidInFull=!formData.paidInFull;renderForm()"></button></div>
+    ${formData.paidInFull?`<div class="form-group"><label class="form-label">Payment Date</label><input class="form-input" type="date" value="${esc(formData.paymentDate||'')}" onchange="formData.paymentDate=this.value"></div>`:''}
+    <div class="form-section-title">Notes</div>
+    <div class="form-group"><textarea class="form-textarea" placeholder="Special requests, notes..." oninput="formData.notes=this.value">${esc(formData.notes||'')}</textarea></div>
+    <div id="form-error"></div>
+    <button class="save-btn" onclick="saveBookingForm()">${isEdit?'Update Booking':'Save Booking'}</button>
+    ${isEdit?`<button onclick="cancelEdit()" style="width:100%;background:none;border:none;color:var(--muted);font-size:14px;padding:12px;cursor:pointer;margin-top:8px">Cancel</button>`:''}`;
+  document.getElementById('booking-form-wrap').innerHTML=html;
+
+  // Handle custom source
+  const sel=document.querySelector('#booking-form-wrap select[onchange="formData.source=this.value"]');
+  if(sel){
+    sel.value=formData.source||'';
+    sel.addEventListener('change',function(){
+      if(this.value==='_custom'){
+        const custom=prompt('Enter custom booking source:');
+        if(custom&&custom.trim()){formData.source=custom.trim();renderForm();}
+        else{this.value=formData.source||'';} 
+      } else {
+        formData.source=this.value;
+      }
+    });
+  }
+}
+
+function saveBookingForm(){
+  const fn=document.getElementById('f-firstName');if(fn)formData.firstName=fn.value;
+  const ln=document.getElementById('f-lastName');if(ln)formData.lastName=ln.value;
+  if(!formData.firstName?.trim()){showFormError('Please enter a first name.');return;}
+  if(!formData.unitId){showFormError('Please select a unit.');return;}
+  if(!formData.checkIn||!formData.checkOut){showFormError('Please set check-in and check-out.');return;}
+  if(formData.checkIn>=formData.checkOut){showFormError('Check-out must be after check-in.');return;}
+  if(!isUnitAvailable(formData.unitId,formData.checkIn,formData.checkOut,formData.id)){
+    const u=unitById(formData.unitId);showFormError(`${u?.name} is already booked for those dates!`);return;
+  }
+  if(formData.id){const idx=bookings.findIndex(b=>b.id===formData.id);if(idx>=0)bookings[idx]={...formData};}
+  else bookings.push({...formData,id:genId()});
+  saveBookings();formData={};showToast('Booking saved!');switchTab('bookings');
+}
+
+function showFormError(msg){const el=document.getElementById('form-error');if(el)el.innerHTML=`<div class="error-msg">${esc(msg)}</div>`;}
+function cancelEdit(){formData={};switchTab('bookings');}
+
+function renderBookingsList(){
+  const filters=[{id:'all',label:'All'},{id:'upcoming',label:'Upcoming'},{id:'paid',label:'Paid'},{id:'deposit',label:'Deposit'},{id:'unpaid',label:'Unpaid'},{id:'rooms',label:'Rooms'},{id:'camps',label:'Camps'},{id:'intl',label:'International'},{id:'pensioner',label:'Pensioners'}];
+  document.getElementById('list-filters').innerHTML=filters.map(f=>`<div class="filter-chip${listFilter===f.id?' active':''}" onclick="listFilter='${f.id}';renderBookingsList()">${f.label}</div>`).join('');
+  const q=(document.getElementById('list-search')?.value||'').toLowerCase();
+  const today=todayStr();
+  const filtered=bookings.filter(b=>{
+    const u=unitById(b.unitId);
+    const matchQ=!q||`${b.firstName} ${b.lastName}`.toLowerCase().includes(q)||(b.phone||'').includes(q)||(u?.name||'').toLowerCase().includes(q);
+    if(!matchQ)return false;
+    const ps=payStatus(b);
+    if(listFilter==='upcoming')return b.checkIn>=today;
+    if(listFilter==='unpaid')return ps==='none';
+    if(listFilter==='deposit')return ps==='deposit';
+    if(listFilter==='paid')return ps==='full';
+    if(listFilter==='rooms')return u?.type==='room';
+    if(listFilter==='camps')return u?.type==='camp';
+    if(listFilter==='intl')return isInternational(b);
+    if(listFilter==='pensioner')return isPensioner(b);
+    return true;
+  }).sort((a,b)=>a.checkIn<b.checkIn?1:-1);
+  if(!filtered.length){document.getElementById('bookings-list').innerHTML=`<div class="empty-state"><div class="empty-icon">&#128203;</div><div style="font-size:15px">No bookings found</div></div>`;return;}
+  document.getElementById('bookings-list').innerHTML=filtered.map(b=>{
+    const u=unitById(b.unitId);const nights=b.checkIn&&b.checkOut?diffDays(b.checkIn,b.checkOut):0;const ps=payStatus(b);
+    const tags=(isPensioner(b)?'<span class="pensioner-badge">&#129438; Pensioner</span>':'')+(isInternational(b)?'<span class="intl-badge">&#127760; Intl</span>':'');
+    return `<div class="booking-card ${u?.type||'room'}" onclick="openBookingModal(bookings.find(x=>x.id==='${b.id}'))"><div class="booking-card-top"><div><div class="booking-guest">${esc(b.firstName)} ${esc(b.lastName)}${nights>0?`<span class="nights-badge">${nights}n</span>`:''}${tags}</div><div class="booking-unit">${esc(u?.name||'&#8212;')} &middot; ${esc(b.source||'')}</div></div><div class="pay-dot pay-${ps}"></div></div><div class="booking-dates">${b.checkIn} &#8594; ${b.checkOut}${b.totalPrice?` &middot; R${Number(b.totalPrice).toLocaleString()}`:''}</div></div>`;
+  }).join('')+'<div style="height:20px"></div>';
+}
+
+function renderDashboard(){
+  const now=new Date();
+  if(dashMonth===undefined){dashMonth=now.getMonth();dashYear=now.getFullYear();}
+  const periodBks=dashMode==='all'?bookings:bookings.filter(b=>{if(!b.checkIn)return false;const d=parseDate(b.checkIn);return d.getMonth()===dashMonth&&d.getFullYear()===dashYear;});
+  const fullPaid=periodBks.filter(b=>b.paidInFull).length;
+  const depOnly=periodBks.filter(b=>payStatus(b)==='deposit').length;
+  const noPay=periodBks.filter(b=>payStatus(b)==='none').length;
+  const totalRev=periodBks.reduce((s,b)=>s+(parseFloat(b.totalPrice)||0),0);
+  const unitCount={};periodBks.forEach(b=>unitCount[b.unitId]=(unitCount[b.unitId]||0)+1);
+  const unitRanked=[...ALL_UNITS].map(u=>({...u,count:unitCount[u.id]||0})).sort((a,b)=>b.count-a.count).slice(0,6);
+  const maxUC=Math.max(...unitRanked.map(u=>u.count),1);
+  const srcCount={};periodBks.forEach(b=>srcCount[b.source||'Unknown']=(srcCount[b.source||'Unknown']||0)+1);
+  const srcEntries=Object.entries(srcCount).sort((a,b)=>b[1]-a[1]);
+  const maxSrc=Math.max(...Object.values(srcCount),1);
+  const monthNav=`<div class="month-nav"><button class="month-nav-btn" onclick="dashPrev()">&#8249;</button><div class="month-label">${MONTHS_SHORT[dashMonth]} ${dashYear}</div><button class="month-nav-btn" onclick="dashNext()">&#8250;</button><button class="all-time-btn" onclick="dashMode=dashMode==='all'?'month':'all';renderDashboard()">${dashMode==='all'?'By month':'All time'}</button></div>`;
+  document.getElementById('dash-content').innerHTML=`<div class="dash-wrap"><div class="dash-top"><div style="font-family:'Playfair Display',serif;font-size:22px;color:var(--accent)">${dashMode==='all'?'All Time':'Dashboard'}</div>${monthNav}</div><div class="stat-grid"><div class="stat-card"><div class="stat-value">${periodBks.length}</div><div class="stat-label">${dashMode==='all'?'Total':'This Month'}</div></div><div class="stat-card"><div class="stat-value" style="color:var(--success)">${fmtR(totalRev)}</div><div class="stat-label">Revenue</div></div><div class="stat-card"><div class="stat-value" style="color:var(--success)">${fullPaid}</div><div class="stat-label">Fully Paid</div></div><div class="stat-card"><div class="stat-value" style="color:var(--danger)">${noPay}</div><div class="stat-label">Unpaid</div></div></div><div class="section-title">Payment Breakdown</div><div style="padding:8px 20px 16px">${[{l:'Fully Paid',v:fullPaid,c:'var(--success)'},{l:'Deposit Only',v:depOnly,c:'var(--warn)'},{l:'No Payment',v:noPay,c:'var(--danger)'}].map(x=>`<div class="bar-row"><div class="bar-name">${x.l}</div><div class="bar-track"><div class="bar-fill" style="width:${periodBks.length?(x.v/periodBks.length)*100:0}%;background:${x.c}"></div></div><div class="bar-count">${x.v}</div></div>`).join('')}</div><div class="section-title">Unit Popularity</div><div style="padding:8px 20px 16px">${unitRanked.map(u=>`<div class="bar-row"><div class="bar-name" style="color:${u.type==='room'?'var(--room)':'var(--camp)'}">${esc(u.name)}</div><div class="bar-track"><div class="bar-fill" style="width:${(u.count/maxUC)*100}%"></div></div><div class="bar-count">${u.count}</div></div>`).join('')}</div><div class="section-title">Booking Sources</div><div style="padding:8px 20px 20px">${srcEntries.length===0?'<div style="color:var(--muted);font-size:13px;text-align:center;padding:12px 0">No data</div>':srcEntries.map(([src,cnt])=>`<div class="bar-row"><div class="bar-name">${esc(src)}</div><div class="bar-track"><div class="bar-fill" style="width:${(cnt/maxSrc)*100}%"></div></div><div class="bar-count">${cnt}</div></div>`).join('')}</div></div>`;
+}
+
+function dashPrev(){if(dashMonth===0){dashMonth=11;dashYear--;}else dashMonth--;renderDashboard()}
+function dashNext(){if(dashMonth===11){dashMonth=0;dashYear++;}else dashMonth++;renderDashboard()}
+
+function renderOwed(){
+  const owedBks=bookings.filter(b=>{
+    const ps=payStatus(b);if(ps==='full')return false;
+    if(oweFilter==='none')return ps==='none';
+    if(oweFilter==='deposit')return ps==='deposit';
+    return true;
+  }).sort((a,b)=>a.checkIn<b.checkIn?-1:1);
+  const totalOwed=owedBks.reduce((s,b)=>{const price=parseFloat(b.totalPrice)||0;const dep=parseFloat(b.depositAmount)||0;return s+(payStatus(b)==='deposit'&&dep>0?Math.max(0,price-dep):price);},0);
+  const cards=owedBks.length===0?`<div style="text-align:center;padding:40px 20px"><div style="font-size:40px">&#127881;</div><div style="font-size:14px;font-weight:600;color:var(--success);margin-top:8px">All settled up!</div></div>`:owedBks.map(b=>{
+    const u=unitById(b.unitId);const ps=payStatus(b);const price=parseFloat(b.totalPrice)||0;const dep=parseFloat(b.depositAmount)||0;
+    const bal=ps==='deposit'&&dep>0?Math.max(0,price-dep):price;const nights=b.checkIn&&b.checkOut?diffDays(b.checkIn,b.checkOut):0;
+    return `<div class="owes-card owe-${ps}" onclick="openBookingModal(bookings.find(x=>x.id==='${b.id}'))"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-size:15px;font-weight:600">${esc(b.firstName)} ${esc(b.lastName)}</div><div style="font-size:12px;color:var(--muted);margin-top:2px">${esc(u?.name||'&#8212;')} &middot; ${nights}n</div><div style="font-size:11px;color:var(--muted);margin-top:4px">${b.checkIn} &#8594; ${b.checkOut}</div>${ps==='deposit'&&dep>0?`<div style="font-size:11px;color:var(--muted);margin-top:2px">Deposit: R${dep.toLocaleString()} paid</div>`:''}</div><div style="text-align:right"><div class="owe-amount${ps==='deposit'?' partial':''}">${bal>0?fmtR(bal):'&#8212;'}</div><div class="owe-label">${ps==='none'?'Full amount due':'Balance owing'}</div></div></div></div>`;
+  }).join('');
+  document.getElementById('owed-content').innerHTML=`<div style="padding:16px 20px 0;display:flex;align-items:center;justify-content:space-between"><div style="font-family:'Playfair Display',serif;font-size:22px;color:var(--accent)">Money Owed</div>${owedBks.length>0?`<div style="font-size:15px;font-weight:700;color:var(--danger)">${fmtR(totalOwed)}</div>`:''}</div><div class="filter-row" style="padding:12px 20px">${[{id:'all',l:'All Owing'},{id:'none',l:'&#128308; No Deposit'},{id:'deposit',l:'&#128992; Partial'}].map(f=>`<div class="filter-chip${oweFilter===f.id?' active':''}" onclick="oweFilter='${f.id}';renderOwed()">${f.l}</div>`).join('')}</div>${cards}<div style="height:40px"></div>`;
+}
+
+function renderGuests(){
+  const total=bookings.length;
+  const intlBks=bookings.filter(b=>isInternational(b));
+  const saBks=bookings.filter(b=>b.origin&&!isInternational(b));
+  const pensioners=bookings.filter(b=>isPensioner(b));
+  const pensRooms=pensioners.filter(b=>unitById(b.unitId)?.type==='room').length;
+  const penscamps=pensioners.filter(b=>unitById(b.unitId)?.type==='camp').length;
+
+  // Province breakdown
+  const provCount={};
+  saBks.forEach(b=>{const p=b.origin||'Unknown';provCount[p]=(provCount[p]||0)+1;});
+  const provEntries=Object.entries(provCount).sort((a,b)=>b[1]-a[1]);
+  const maxProv=Math.max(...Object.values(provCount),1);
+
+  // Country breakdown
+  const countryCount={};
+  intlBks.forEach(b=>{const c=b.origin||'Unknown';countryCount[c]=(countryCount[c]||0)+1;});
+  const countryEntries=Object.entries(countryCount).sort((a,b)=>b[1]-a[1]);
+  const maxCountry=Math.max(...Object.values(countryCount),1);
+
+  const pct=(n,d)=>d>0?Math.round((n/d)*100)+'%':'0%';
+
+  document.getElementById('guests-content').innerHTML=`<div style="padding:16px 20px 80px">
+    <div style="font-family:'Playfair Display',serif;font-size:22px;color:var(--accent);margin-bottom:16px">Guest Analytics</div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Total Bookings</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:var(--room)">${intlBks.length}</div><div class="stat-label">International</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:var(--success)">${saBks.length}</div><div class="stat-label">South African</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:var(--warn)">${pensioners.length}</div><div class="stat-label">Pensioners</div></div>
+    </div>
+    <div class="section-title">SA vs International</div>
+    <div style="padding:8px 20px 16px">
+      <div class="bar-row"><div class="bar-name">&#127487;&#127462; South African</div><div class="bar-track"><div class="bar-fill" style="width:${total?(saBks.length/total)*100:0}%;background:var(--success)"></div></div><div class="bar-count">${pct(saBks.length,total)}</div></div>
+      <div class="bar-row"><div class="bar-name">&#127760; International</div><div class="bar-track"><div class="bar-fill" style="width:${total?(intlBks.length/total)*100:0}%;background:var(--room)"></div></div><div class="bar-count">${pct(intlBks.length,total)}</div></div>
+    </div>
+    <div class="section-title">Pensioners</div>
+    <div style="padding:8px 20px 16px">
+      <div class="bar-row"><div class="bar-name">&#129438; Rooms</div><div class="bar-track"><div class="bar-fill" style="width:${pensioners.length?(pensRooms/pensioners.length)*100:0}%;background:var(--warn)"></div></div><div class="bar-count">${pensRooms}</div></div>
+      <div class="bar-row"><div class="bar-name">&#129438; Campsites</div><div class="bar-track"><div class="bar-fill" style="width:${pensioners.length?(penscamp/pensioners.length)*100:0}%;background:var(--warn)"></div></div><div class="bar-count">${penscamp}</div></div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px">Total pensioners: ${pensioners.length} (${pct(pensioners.length,total)} of all bookings)</div>
+    </div>
+    ${provEntries.length>0?`<div class="section-title">SA Provinces</div><div style="padding:8px 20px 16px">${provEntries.map(([p,c])=>`<div class="bar-row"><div class="bar-name">${esc(p)}</div><div class="bar-track"><div class="bar-fill" style="width:${(c/maxProv)*100}%"></div></div><div class="bar-count">${c}</div></div>`).join('')}</div>`:''}
+    ${countryEntries.length>0?`<div class="section-title">International Origins</div><div style="padding:8px 20px 16px">${countryEntries.map(([c,n])=>`<div class="bar-row"><div class="bar-name">${esc(c)}</div><div class="bar-track"><div class="bar-fill" style="width:${(n/maxCountry)*100}%;background:var(--room)"></div></div><div class="bar-count">${n}</div></div>`).join('')}</div>`:''}
+    ${total===0||(!saBks.length&&!intlBks.length&&!pensioners.length)?'<div style="text-align:center;padding:24px;color:var(--muted);font-size:14px">Add province/country and pensioner info to bookings to see analytics here.</div>':''}
+  </div>`;
+}
+
+function openBookingModal(b){
+  if(!b)return;
+  const u=unitById(b.unitId);const nights=b.checkIn&&b.checkOut?diffDays(b.checkIn,b.checkOut):0;
+  const ps=payStatus(b);const psLabel=ps==='full'?'Paid in Full':ps==='deposit'?'Deposit Paid':'No Payment';
+  const dep=parseFloat(b.depositAmount)||0;const price=parseFloat(b.totalPrice)||0;
+  const bday=getBirthday(b);
+  const rows=[
+    ['Phone',b.phone||'&#8212;'],['Email',b.email||'&#8212;'],
+    b.idNumber?['ID/Passport',b.idNumber]:null,
+    b.origin?['Origin',b.origin]:null,
+    isPensioner(b)?['Status','&#129438; Pensioner']:null,
+    bday?['Birthday',bday]:null,
+    ['Check-in',b.checkIn],['Check-out',b.checkOut],['Nights',String(nights)],
+    ['Source',b.source||'&#8212;'],
+    ['Total Price',b.totalPrice?`R${Number(b.totalPrice).toLocaleString()}`:'&#8212;'],
+    ['Payment',psLabel],
+    b.depositPaid&&b.depositAmount?['Deposit Paid',`R${Number(b.depositAmount).toLocaleString()}`]:null,
+    b.depositPaid&&b.depositAmount&&b.totalPrice&&!b.paidInFull?['Balance Owing',`R${Math.max(0,price-dep).toLocaleString()}`]:null,
+    b.depositDate?['Deposit Date',b.depositDate]:null,
+    b.paymentDate?['Payment Date',b.paymentDate]:null,
+    b.stayed?['Status','&#9989; Stayed &amp; Checked Out']:null,
+    b.notes?['Notes',b.notes]:null,
+  ].filter(Boolean);
+  showModal(`<div class="modal-handle"></div><div class="modal-title">${esc(b.firstName)} ${esc(b.lastName)}</div><div class="modal-unit">${esc(u?.name||'&#8212;')} &middot; ${nights} night${nights!==1?'s':''}</div>${rows.map(([k,v])=>`<div class="detail-row"><span class="detail-key">${k}</span><span class="detail-val">${v}</span></div>`).join('')}<div class="modal-actions"><button class="btn-edit" onclick="closeModal();editBooking('${b.id}')">&#9998; Edit</button><button class="btn-delete" onclick="deleteBooking('${b.id}')">&#128465; Delete</button></div>`);
+}
+
+function editBooking(id){const b=bookings.find(x=>x.id===id);if(!b)return;formData={...b};switchTab('new');}
+function deleteBooking(id){if(!confirm('Delete this booking?'))return;bookings=bookings.filter(x=>x.id!==id);saveBookings();closeModal();showToast('Booking deleted');renderBookingsList();}
+function showModal(html){document.getElementById('modal-sheet').innerHTML=html;document.getElementById('modal-overlay').classList.remove('hidden');}
+function closeModal(){document.getElementById('modal-overlay').classList.add('hidden');}
+
+function handleExportXLSX(){
+  const sorted=[...bookings].sort((a,b)=>a.checkIn<b.checkIn?-1:1);
+  const rows=sorted.map(b=>{const u=unitById(b.unitId);const ps=payStatus(b);const bal=ps==='deposit'&&b.depositAmount?Math.max(0,(parseFloat(b.totalPrice)||0)-(parseFloat(b.depositAmount)||0)):ps==='none'?(parseFloat(b.totalPrice)||0):0;return{'First Name':b.firstName||'','Surname':b.lastName||'','Phone':b.phone||'','Email':b.email||'','ID Number':b.idNumber||'','Province/Country':b.origin||'','Pensioner':b.pensioner?'Yes':'','Birthday':getBirthday(b),'Unit':u?.name||'','Type':u?.type==='room'?'Room':'Campsite','Check-in':b.checkIn||'','Check-out':b.checkOut||'','Nights':b.checkIn&&b.checkOut?diffDays(b.checkIn,b.checkOut):0,'Source':b.source||'','Total Price (R)':b.totalPrice?parseFloat(b.totalPrice):0,'Deposit Paid':b.depositPaid?'Yes':'No','Deposit Amount (R)':b.depositAmount?parseFloat(b.depositAmount):0,'Balance Owing (R)':bal||0,'Paid in Full':b.paidInFull?'Yes':'No','Payment Status':ps==='full'?'Paid in Full':ps==='deposit'?'Deposit Paid':'No Payment','Stayed':b.stayed?'Yes':'No','Notes':b.notes||''};});
+  const ws=XLSX.utils.json_to_sheet(rows);
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Bookings');
+  XLSX.writeFile(wb,`Guesthouse-Bookings-${todayStr()}.xlsx`);
+  closeMenu();showToast('Excel file downloading!');
+}
+
+function triggerImport(){document.getElementById('import-file-input').click();}
+function handleImportXLSX(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(ev){
+    try{
+      const wb=XLSX.read(ev.target.result,{type:'array'});
+      const ws=wb.Sheets['Bookings']||wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws);if(!rows.length)throw new Error('Empty');
+      const imported=rows.map(r=>{const uname=String(r['Unit']||'');const u=ALL_UNITS.find(x=>x.name===uname);return{id:genId(),firstName:String(r['First Name']||''),lastName:String(r['Surname']||''),phone:String(r['Phone']||''),email:String(r['Email']||''),idNumber:String(r['ID Number']||''),origin:String(r['Province/Country']||''),pensioner:r['Pensioner']==='Yes',birthday:String(r['Birthday']||''),unitId:u?.id||'',checkIn:String(r['Check-in']||''),checkOut:String(r['Check-out']||''),source:String(r['Source']||''),totalPrice:r['Total Price (R)']!=null?String(r['Total Price (R)']):'',depositPaid:r['Deposit Paid']==='Yes',depositAmount:r['Deposit Amount (R)']!=null?String(r['Deposit Amount (R)']):'',depositDate:String(r['Deposit Date']||''),paidInFull:r['Paid in Full']==='Yes',paymentDate:String(r['Payment Date']||''),stayed:r['Stayed']==='Yes',notes:String(r['Notes']||'')};});
+      let added=0;imported.forEach(b=>{const dup=bookings.some(p=>`${p.firstName}|${p.checkIn}|${p.unitId}`===`${b.firstName}|${b.checkIn}|${b.unitId}`);if(!dup){bookings.push(b);added++;}});
+      saveBookings();closeMenu();showToast(`${added} bookings imported!`);if(currentTab==='bookings')renderBookingsList();
+    }catch(e){const el=document.getElementById('import-error');el.textContent='Could not read file.';el.style.display='block';}
+  };
+  reader.readAsArrayBuffer(file);input.value='';
+}
+
+function copyAllData(){
+  if(!bookings.length){showToast('No bookings to copy');return;}
+  const sorted=[...bookings].sort((a,b)=>a.checkIn<b.checkIn?-1:1);
+  const lines=sorted.map((b,i)=>{const u=unitById(b.unitId);const ps=payStatus(b);const price=parseFloat(b.totalPrice)||0;const dep=parseFloat(b.depositAmount)||0;const bal=ps==='deposit'&&dep>0?Math.max(0,price-dep):ps==='none'?price:0;return[`--- Booking ${i+1} ---`,`Name: ${b.firstName||''} ${b.lastName||''}`,`Phone: ${b.phone||'--'}`,`Unit: ${u?.name||'--'}`,`Check-in: ${b.checkIn||'--'}`,`Check-out: ${b.checkOut||'--'}`,`Total: R${price.toLocaleString()}`,`Payment: ${ps}`,bal>0?`Balance: R${bal.toLocaleString()}`:'',b.notes?`Notes: ${b.notes}`:''].filter(Boolean).join('\n');});
+  const text=`THE GUESTHOUSE - ${bookings.length} BOOKINGS\nExported: ${todayStr()}\n\n`+lines.join('\n\n');
+  navigator.clipboard.writeText(text).then(()=>{const el=document.getElementById('copy-result');el.textContent=`${bookings.length} bookings copied!`;el.style.display='block';}).catch(()=>{const ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.focus();ta.select();try{document.execCommand('copy');const el=document.getElementById('copy-result');el.textContent=`${bookings.length} bookings copied!`;el.style.display='block';}catch(e){showToast('Copy failed');}document.body.removeChild(ta);});
+}
+
+function openBirthdayExport(){document.getElementById('bday-overlay').classList.remove('hidden');}
+function downloadBirthdayList(){
+  const month=parseInt(document.getElementById('bday-month').value);
+  const guests=bookings.filter(b=>{
+    const bday=getBirthday(b);
+    if(!bday)return false;
+    const m=parseInt(bday.split('-')[1]);
+    return m===month;
+  });
+  if(!guests.length){showToast('No guests with birthdays in that month');return;}
+  const rows=guests.map(b=>({'First Name':b.firstName||'','Surname':b.lastName||'','Phone':b.phone||'','Email':b.email||'','Birthday':getBirthday(b),'Last Stay':b.checkIn||'','Unit':unitById(b.unitId)?.name||'','Origin':b.origin||''}));
+  const ws=XLSX.utils.json_to_sheet(rows);
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Birthdays');
+  XLSX.writeFile(wb,`Birthday-Guests-${MONTHS[month-1]}.xlsx`);
+  document.getElementById('bday-overlay').classList.add('hidden');
+  showToast(`${guests.length} guests downloaded!`);
+}
+
+// Seed data
+const SEED=[{"id":"b001","firstName":"Neil","lastName":"Grant","phone":"0761129021","email":"","unitId":"c1","checkIn":"2026-04-08","checkOut":"2026-04-10","source":"Walkin","totalPrice":"600","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":true,"paymentDate":"","notes":"Tent on site 2"},{"id":"b002","firstName":"Alain","lastName":"Hocepied","phone":"0782334095","email":"ahocep.936833@guest.booking.com","unitId":"r5","checkIn":"2026-04-09","checkOut":"2026-04-11","source":"Booking.com","totalPrice":"2520","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":true,"paymentDate":"","notes":"Arrive between 2 and 4pm"},{"id":"b003","firstName":"Jenny","lastName":"Evans","phone":"","email":"jenny@scottnet.co.za","unitId":"c3","checkIn":"2026-04-09","checkOut":"2026-04-12","source":"Honory rangers weekend","totalPrice":"1200","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":true,"paymentDate":"","notes":""},{"id":"b004","firstName":"Jenny","lastName":"Evans","phone":"","email":"","unitId":"c4","checkIn":"2026-04-09","checkOut":"2026-04-12","source":"Honory rangers weekend","totalPrice":"1200","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":true,"paymentDate":"","notes":""},{"id":"b005","firstName":"Yvette","lastName":"Penfold","phone":"","email":"penfoldyvette60@gmail.com","unitId":"r4","checkIn":"2026-04-09","checkOut":"2026-04-10","source":"Direct","totalPrice":"1200","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":true,"paymentDate":"","notes":""},{"id":"b006","firstName":"Jenny","lastName":"Williamson","phone":"0829013390","email":"jnywil@gmail.com","unitId":"r1","checkIn":"2026-04-17","checkOut":"2026-04-19","source":"Direct","totalPrice":"1700","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":true,"paymentDate":"","notes":"Camera club"},{"id":"b007","firstName":"Rene","lastName":"Scheepers","phone":"0820445970","email":"","unitId":"r5","checkIn":"2026-04-17","checkOut":"2026-04-19","source":"Direct","totalPrice":"5400","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":true,"paymentDate":"","notes":"Camera club 2 rooms"},{"id":"b008","firstName":"Rene","lastName":"Scheepers","phone":"0820445970","email":"","unitId":"r3","checkIn":"2026-04-17","checkOut":"2026-04-19","source":"Direct","totalPrice":"0","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":true,"paymentDate":"","notes":"Camera club 2 rooms"},{"id":"b009","firstName":"Marita","lastName":"Dempers","phone":"","email":"marita.dempers@gmail.com","unitId":"c1","checkIn":"2026-04-17","checkOut":"2026-04-24","source":"Direct","totalPrice":"2800","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":true,"paymentDate":"","notes":"Camera club"},{"id":"b010","firstName":"Heepko","lastName":"Van Kaam","phone":"0826060473","email":"heepko@lantic.net","unitId":"c2","checkIn":"2026-04-17","checkOut":"2026-04-19","source":"Direct","totalPrice":"800","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":true,"paymentDate":"","notes":"Camera club"},{"id":"b011","firstName":"Nelia","lastName":"Grundling","phone":"0832636550","email":"","unitId":"c4","checkIn":"2026-04-17","checkOut":"2026-04-24","source":"Direct","totalPrice":"3500","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":true,"paymentDate":"","notes":"Wheel chair friendly. Nelia plus another lady"},{"id":"b012","firstName":"Lomie","lastName":"Smith","phone":"","email":"","unitId":"c3","checkIn":"2026-04-17","checkOut":"2026-04-19","source":"Direct","totalPrice":"800","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":true,"paymentDate":"","notes":"Camera club organiser"},{"id":"b013","firstName":"Mark","lastName":"Graham","phone":"0832923440","email":"","unitId":"c2","checkIn":"2026-04-21","checkOut":"2026-04-25","source":"Repeat","totalPrice":"1200","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":true,"paymentDate":"","notes":""},{"id":"b014","firstName":"Denis","lastName":"Goffinet","phone":"0791909865","email":"","unitId":"r4","checkIn":"2026-04-22","checkOut":"2026-04-23","source":"Swop and stay","totalPrice":"0","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":true,"paymentDate":"","notes":"Guests names Lyn Lambert and sister"},{"id":"b015","firstName":"Lorraine","lastName":"Van rensburg","phone":"","email":"","unitId":"c1","checkIn":"2026-04-24","checkOut":"2026-04-26","source":"Direct","totalPrice":"1800","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":true,"paymentDate":"","notes":"4 adults 2 rooftop tents"},{"id":"b016","firstName":"Gustav","lastName":"Schult","phone":"0839787328","email":"gustavschult@gmail.com","unitId":"c4","checkIn":"2026-04-24","checkOut":"2026-04-27","source":"CampLivSA","totalPrice":"1800","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":true,"paymentDate":"","notes":"Caravan SA"},{"id":"b017","firstName":"Heidi","lastName":"Palmboom","phone":"","email":"","unitId":"r4","checkIn":"2026-04-27","checkOut":"2026-04-28","source":"Swop and stay","totalPrice":"0","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":true,"paymentDate":"","notes":"ANSTYS BACKPACKERS"},{"id":"b018","firstName":"Helen","lastName":"Taylor","phone":"0833075402","email":"","unitId":"c1","checkIn":"2026-05-01","checkOut":"2026-05-04","source":"Direct","totalPrice":"1800","depositPaid":true,"depositAmount":"900","depositDate":"","paidInFull":false,"paymentDate":"","notes":""},{"id":"b019","firstName":"Peter","lastName":"Odermatt","phone":"+31630031067","email":"poderm.664161@guest.booking.com","unitId":"r1","checkIn":"2026-05-10","checkOut":"2026-05-11","source":"Booking.com","totalPrice":"1147.50","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":false,"paymentDate":"","notes":"Due R1147.50 vc 3 may. Dutch"},{"id":"b020","firstName":"Geoff","lastName":"Crane","phone":"","email":"","unitId":"r1","checkIn":"2026-05-14","checkOut":"2026-05-15","source":"Repeat","totalPrice":"0","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":true,"paymentDate":"","notes":"5 in total, 4 rooms bed only. Room 1 x 1"},{"id":"b021","firstName":"Geoff","lastName":"Crane","phone":"","email":"","unitId":"r2","checkIn":"2026-05-14","checkOut":"2026-05-15","source":"Repeat","totalPrice":"0","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":true,"paymentDate":"","notes":"4 rooms 5 people in total. Room 2 x 2 pax"},{"id":"b022","firstName":"Geoff","lastName":"Crane","phone":"","email":"","unitId":"r3","checkIn":"2026-05-14","checkOut":"2026-05-15","source":"Repeat","totalPrice":"0","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":true,"paymentDate":"","notes":"4 rooms 5 people. Room 3 x 1 pax"},{"id":"b023","firstName":"Geoff","lastName":"Crane","phone":"","email":"","unitId":"r4","checkIn":"2026-05-14","checkOut":"2026-05-15","source":"Repeat","totalPrice":"0","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":true,"paymentDate":"","notes":"4 rooms 5 people in total. Room 4 x 1 pax"},{"id":"b024","firstName":"Joshua","lastName":"Stone","phone":"+14104767870","email":"jstone.66374@guest.booking.com","unitId":"r1","checkIn":"2026-05-15","checkOut":"2026-05-16","source":"Booking.com","totalPrice":"1950.75","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":false,"paymentDate":"","notes":"R1950.75 due 8 may vc. Arrive 7 to 8pm. USA"},{"id":"b025","firstName":"Joshua","lastName":"Stone","phone":"","email":"","unitId":"r3","checkIn":"2026-05-15","checkOut":"2026-05-16","source":"Booking.com","totalPrice":"0","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":false,"paymentDate":"","notes":"2 rooms, 3 pax arrive 7 to 8pm. USA"},{"id":"b026","firstName":"Gerald","lastName":"Van Der Merwe","phone":"","email":"","unitId":"r5","checkIn":"2026-06-26","checkOut":"2026-06-28","source":"Direct","totalPrice":"4000","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":true,"paymentDate":"","notes":"Price includes 2 x breakfast on both days. Newcastle"},{"id":"b027","firstName":"Melaney","lastName":"Smith","phone":"0834109387","email":"msmith.381197@guest.booking.com","unitId":"r1","checkIn":"2026-06-26","checkOut":"2026-06-29","source":"Booking.com","totalPrice":"10212.75","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":false,"paymentDate":"","notes":"Vc 19 june. Booked Guesthouse 4 rooms R10212.75"},{"id":"b028","firstName":"Melaney","lastName":"Smith","phone":"","email":"","unitId":"r2","checkIn":"2026-06-26","checkOut":"2026-06-29","source":"Direct","totalPrice":"0","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":false,"paymentDate":"","notes":""},{"id":"b029","firstName":"Melaney","lastName":"Smith","phone":"","email":"","unitId":"r3","checkIn":"2026-06-26","checkOut":"2026-06-29","source":"Direct","totalPrice":"0","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":false,"paymentDate":"","notes":""},{"id":"b030","firstName":"Melaney","lastName":"Smith","phone":"","email":"","unitId":"r4","checkIn":"2026-06-26","checkOut":"2026-06-29","source":"Booking.com","totalPrice":"0","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":false,"paymentDate":"","notes":""},{"id":"b031","firstName":"Felicity","lastName":"GowerJackson","phone":"0723732323","email":"","unitId":"c1","checkIn":"2026-06-27","checkOut":"2026-06-28","source":"Direct","totalPrice":"400","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":true,"paymentDate":"","notes":""},{"id":"b032","firstName":"Tjaart","lastName":"Kruger","phone":"","email":"tnkruger@outlook.com","unitId":"c1","checkIn":"2026-07-02","checkOut":"2026-07-05","source":"Direct","totalPrice":"1200","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":true,"paymentDate":"","notes":"Family join for 2 days"},{"id":"b033","firstName":"Jeffrey","lastName":"Ed","phone":"0835168106","email":"jed.575686@guest.booking.com","unitId":"r2","checkIn":"2026-07-02","checkOut":"2026-07-03","source":"Booking.com","totalPrice":"2970","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":false,"paymentDate":"","notes":"3 rooms, 6 pax in total"},{"id":"b034","firstName":"Jeffrey","lastName":"Ed","phone":"","email":"","unitId":"r3","checkIn":"2026-07-02","checkOut":"2026-07-03","source":"Booking.com","totalPrice":"0","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":false,"paymentDate":"","notes":"3 rooms 6 pax"},{"id":"b035","firstName":"Jeffrey","lastName":"Ed","phone":"","email":"","unitId":"r4","checkIn":"2026-07-02","checkOut":"2026-07-03","source":"Booking.com","totalPrice":"0","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":false,"paymentDate":"","notes":"Children 10 and 14"},{"id":"b036","firstName":"Tjaart","lastName":"Kruger","phone":"","email":"tnkruger@outlook.com","unitId":"c2","checkIn":"2026-07-03","checkOut":"2026-07-05","source":"Direct","totalPrice":"800","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":true,"paymentDate":"","notes":"Joining parents"},{"id":"b037","firstName":"Thomas & Claudia","lastName":"Muller","phone":"","email":"muelli.t@icloud.com","unitId":"c1","checkIn":"2026-07-13","checkOut":"2026-07-14","source":"Direct","totalPrice":"600","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":true,"paymentDate":"","notes":"Switzerland with kids and rooftop tent"},{"id":"b038","firstName":"Renette","lastName":"Kirsten","phone":"0827704627","email":"rkirst.204793@guest.booking.com","unitId":"r1","checkIn":"2026-07-24","checkOut":"2026-07-26","source":"Booking.com","totalPrice":"1683","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":false,"paymentDate":"","notes":"Vc 17 July. Springs"},{"id":"b039","firstName":"Gavin","lastName":"Ball","phone":"0828052411","email":"gball.314246@guest.booking.com","unitId":"r4","checkIn":"2026-07-24","checkOut":"2026-07-26","source":"Booking.com","totalPrice":"1683","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":false,"paymentDate":"","notes":"Vc 17 july"},{"id":"b040","firstName":"Amanda","lastName":"Lourens","phone":"0828051711","email":"lamand.139839@guest.booking.com","unitId":"r2","checkIn":"2026-07-24","checkOut":"2026-07-26","source":"Booking.com","totalPrice":"1782","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":false,"paymentDate":"","notes":"Vc 17 july"},{"id":"b041","firstName":"Monica","lastName":"Van breede","phone":"0833070076","email":"vmonic.751099@guest.booking.com","unitId":"r3","checkIn":"2026-07-24","checkOut":"2026-07-26","source":"Booking.com","totalPrice":"1683","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":false,"paymentDate":"","notes":"Vc 17 july"},{"id":"b042","firstName":"Craig","lastName":"Ek","phone":"0835516608","email":"craig.ek@secosa.co.za","unitId":"r5","checkIn":"2026-07-24","checkOut":"2026-07-26","source":"Direct","totalPrice":"2800","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":true,"paymentDate":"","notes":""},{"id":"b043","firstName":"Ellen & Alan","lastName":"Russel","phone":"0828880040","email":"","unitId":"c3","checkIn":"2026-07-24","checkOut":"2026-07-27","source":"Direct","totalPrice":"1200","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":false,"paymentDate":"","notes":""},{"id":"b044","firstName":"Frans","lastName":"Van hoogstraten","phone":"","email":"","unitId":"c1","checkIn":"2026-08-22","checkOut":"2026-08-23","source":"Direct","totalPrice":"400","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":false,"paymentDate":"","notes":""},{"id":"b045","firstName":"Penny","lastName":"Bateman","phone":"+34609623492","email":"bpenny.518576@guest.booking.com","unitId":"r5","checkIn":"2026-09-10","checkOut":"2026-09-13","source":"Booking.com","totalPrice":"3750","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":false,"paymentDate":"","notes":"Vc 3 sept"},{"id":"b046","firstName":"Ilze","lastName":"Loots","phone":"0842292904","email":"","unitId":"c4","checkIn":"2026-09-17","checkOut":"2026-09-18","source":"Direct","totalPrice":"400","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":true,"paymentDate":"","notes":""},{"id":"b047","firstName":"Mcrs","lastName":"","phone":"","email":"","unitId":"c1","checkIn":"2026-10-23","checkOut":"2026-10-25","source":"Repeat","totalPrice":"0","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":false,"paymentDate":"","notes":"History weekend"},{"id":"b048","firstName":"Mcrs","lastName":"","phone":"","email":"","unitId":"c2","checkIn":"2026-10-23","checkOut":"2026-10-25","source":"Repeat","totalPrice":"0","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":false,"paymentDate":"","notes":""},{"id":"b049","firstName":"Mcrs","lastName":"","phone":"","email":"","unitId":"c3","checkIn":"2026-10-23","checkOut":"2026-10-25","source":"Repeat","totalPrice":"0","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":false,"paymentDate":"","notes":""},{"id":"b050","firstName":"Mcrs","lastName":"","phone":"","email":"","unitId":"c4","checkIn":"2026-10-23","checkOut":"2026-10-25","source":"Repeat","totalPrice":"0","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":false,"paymentDate":"","notes":""},{"id":"b051","firstName":"Lara","lastName":"De Matos","phone":"0824632944","email":"","unitId":"r5","checkIn":"2026-11-13","checkOut":"2026-11-15","source":"Repeat","totalPrice":"2400","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":false,"paymentDate":"","notes":"Birthday weekend"},{"id":"b052","firstName":"Leslie","lastName":"Correa","phone":"","email":"leslie.correia@gmail.com","unitId":"c1","checkIn":"2027-01-03","checkOut":"2027-01-06","source":"Direct","totalPrice":"2100","depositPaid":false,"depositAmount":"","depositDate":"","paidInFull":false,"paymentDate":"","notes":"5 pax R700 x 3"}];
+
+loadBookings();
+// Migrate old storage key if needed
+if(bookings.length===0){
+  try{const old=localStorage.getItem('guesthouse_bookings_v3');if(old){bookings=JSON.parse(old);saveBookings();}}catch{}
+}
+if(bookings.length===0){bookings=SEED;saveBookings();}
+availDate=todayStr();
+const now=new Date();
+calYear=now.getFullYear();calMonth=now.getMonth();
+dashMonth=now.getMonth();dashYear=now.getFullYear();
+document.getElementById('avail-date').value=availDate;
+// Set default birthday month to current month
+document.getElementById('bday-month').value=String(now.getMonth()+1);
+renderCalendar();
+</script>
+</body>
+</html>

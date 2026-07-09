@@ -363,7 +363,7 @@ async function loadFromSheet(){
       }
     }
     sheetSynced=true;
-    if(currentTab==='calendar')renderCalendar();
+    renderCalendar();
     if(currentTab==='bookings')renderBookingsList();
     if(currentTab==='dashboard')renderDashboard();
     if(currentTab==='owed')renderOwed();
@@ -912,11 +912,12 @@ loadBookings();
 if(bookings.length===0){bookings=SEED;saveBookings();}
 availDate=todayStr();
 const _now=new Date();
-calYear=_now.getFullYear();calMonth=_now.getMonth();
-dashMonth=_now.getMonth();dashYear=_now.getFullYear();
+calYear=_now.getFullYear();
+calMonth=_now.getMonth();
+dashMonth=_now.getMonth();
+dashYear=_now.getFullYear();
 document.getElementById('avail-date').value=availDate;
 renderCalendar();
-// Sync with Google Sheets on startup
 loadFromSheet();
 </script>
 </body>

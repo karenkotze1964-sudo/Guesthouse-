@@ -363,7 +363,7 @@ async function loadFromSheet(){
       }
     }
     sheetSynced=true;
-    renderCalendar();
+    if(currentTab==='calendar')renderCalendar();
     if(currentTab==='bookings')renderBookingsList();
     if(currentTab==='dashboard')renderDashboard();
     if(currentTab==='owed')renderOwed();

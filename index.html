@@ -245,9 +245,9 @@ const DAYS_SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const SA_PROVINCES=['Eastern Cape','Free State','Gauteng','KwaZulu-Natal','Limpopo','Mpumalanga','Northern Cape','North West','Western Cape'];
 const STORAGE_KEY='guesthouse_bookings_v3';
 const SCRIPT_URL='https://script.google.com/macros/s/AKfycbxfa8dNAYrYc9wDrGVbzPPEGMmhUb1c7ku6PB8pHipLZ21Pda5YmuFsV0DXKxgogRlvDw/exec';
-let syncStatus='idle'; // idle, syncing, error
 
-let bookings=[],currentTab='calendar',calYear,calMonth,availDate,listFilter='all',formData={},dashMode='month',dashMonth,dashYear,oweFilter='all',oweMonth='all',guestAnalyticsMode='year',guestAnalyticsYear,guestAnalyticsMonth;
+let bookings=[],currentTab='calendar',calYear,calMonth,availDate,listFilter='all',formData={},dashMode='month',dashMonth,dashYear,oweFilter='all',oweMonth='all';
+let sheetSynced=false;
 
 function todayStr(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 function parseDate(s){return s?new Date(s+'T00:00:00'):null}
@@ -311,7 +311,12 @@ function isUnitAvailable(unitId,checkIn,checkOut,excludeId){
   });
 }
 
-let sheetSynced=false;
+function loadBookings(){
+  try{
+    const s=localStorage.getItem(STORAGE_KEY);
+    if(s)bookings=JSON.parse(s);
+  }catch(e){}
+}
 
 function saveBookings(){
   localStorage.setItem(STORAGE_KEY,JSON.stringify(bookings));
@@ -336,34 +341,29 @@ async function pushToSheet(){
 }
 
 async function loadFromSheet(){
-  // Only pull from sheet once per session, on first load
   if(sheetSynced)return;
   showSyncBanner('Loading from Google Sheets...');
   try{
     const res=await fetch(SCRIPT_URL+'?action=getAll');
     const data=await res.json();
     if(data.bookings&&data.bookings.length>0){
-      // Only use sheet data if it has MORE bookings than local
-      // or if local is empty (seed data)
-      const localIsEmpty=bookings.length===0||bookings.every(b=>b.id.startsWith('b0'));
+      const localIsEmpty=bookings.length===0||bookings.every(b=>b.id&&b.id.startsWith('b0'));
       if(localIsEmpty||data.bookings.length>=bookings.length){
         bookings=data.bookings;
         localStorage.setItem(STORAGE_KEY,JSON.stringify(bookings));
         showSyncBanner('Synced ✓ — '+bookings.length+' bookings',true);
       } else {
-        // Local has more/newer — push local to sheet
         showSyncBanner('Uploading local data to sheet...');
         await pushToSheet();
       }
     } else {
-      // Sheet empty — push local data up
       if(bookings.length>0){
         showSyncBanner('Uploading to Google Sheets...');
         await pushToSheet();
       }
     }
     sheetSynced=true;
-    if(currentTab==='calendar')renderCalendar();
+    renderCalendar();
     if(currentTab==='bookings')renderBookingsList();
     if(currentTab==='dashboard')renderDashboard();
     if(currentTab==='owed')renderOwed();
@@ -493,14 +493,12 @@ function renderAvailability(){
   document.getElementById('avail-content').innerHTML=html;
 }
 
-// ─── FORM — no renderForm() calls on text input, only on toggles/dates/selects ───
 function renderForm(){
   if(!formData.checkIn)formData.checkIn=todayStr();
   if(!formData.checkOut)formData.checkOut=addDays(formData.checkIn,1);
   const isEdit=!!formData.id;
   const nights=formData.checkIn&&formData.checkOut?Math.max(0,diffDays(formData.checkIn,formData.checkOut)):0;
 
-  // Unit options with availability
   let unitOpts=`<option value="">&#8212; Select unit &#8212;</option>`;
   const mkOpts=(units)=>units.map(r=>{
     const avail=!formData.checkIn||!formData.checkOut||isUnitAvailable(r.id,formData.checkIn,formData.checkOut,formData.id);
@@ -576,7 +574,6 @@ function renderForm(){
   document.getElementById('booking-form-wrap').innerHTML=html;
 }
 
-// Save all text fields to formData before re-rendering
 function saveFormFields(){
   const fields={
     'f-firstName':'firstName','f-lastName':'lastName','f-phone':'phone',
@@ -654,7 +651,6 @@ function renderDashboard(){
   const noPay=periodBks.filter(b=>payStatus(b)==='none').length;
   const totalRev=periodBks.reduce((s,b)=>s+(parseFloat(b.totalPrice)||0),0);
 
-  // Bed nights & room nights by type
   let campNights=0,roomNights=0,villagerNights=0,campGuests=0,roomGuests=0,villagerGuests=0;
   periodBks.forEach(b=>{
     const u=unitById(b.unitId);
@@ -730,7 +726,6 @@ function renderOwed(){
   }).sort((a,b)=>a.checkIn<b.checkIn?-1:1);
   const totalOwed=owedBks.reduce((s,b)=>{const price=parseFloat(b.totalPrice)||0;const dep=parseFloat(b.depositAmount)||0;return s+(payStatus(b)==='deposit'&&dep>0?Math.max(0,price-dep):price);},0);
 
-  // Sources that pay late (7 days before) — highlight Booking.com style sources
   const LATE_PAY_SOURCES=['Booking.com','Airbnb','Lekkeslaap'];
 
   const cards=owedBks.length===0?`<div style="text-align:center;padding:40px 20px"><div style="font-size:40px">&#127881;</div><div style="font-size:14px;font-weight:600;color:var(--success);margin-top:8px">All settled up!</div></div>`:owedBks.map(b=>{
@@ -884,7 +879,6 @@ function openBdayModal(){
 function downloadBirthdayList(){
   const month=parseInt(document.getElementById('bday-month').value);
   const guests=[];
-  // De-duplicate by name+birthday
   const seen=new Set();
   bookings.forEach(b=>{
     const bday=getBirthday(b);
@@ -905,8 +899,7 @@ function downloadBirthdayList(){
   showToast(`${guests.length} guests downloaded!`);
 }
 
-// Seed data
-const SEED=[{"id":"b001","firstName":"Neil","lastName":"Grant","phone":"0761129021","email":"","unitId":"c1","checkIn":"2026-04-08","checkOut":"2026-04-10","source":"Walkin","totalPrice":"600","depositPaid":false,"depositAmount":"","paidInFull":true,"notes":"Tent on site 2"},{"id":"b002","firstName":"Alain","lastName":"Hocepied","phone":"0782334095","email":"ahocep.936833@guest.booking.com","unitId":"r5","checkIn":"2026-04-09","checkOut":"2026-04-11","source":"Booking.com","totalPrice":"2520","depositPaid":false,"depositAmount":"","paidInFull":true,"notes":"Arrive between 2 and 4pm"},{"id":"b003","firstName":"Jenny","lastName":"Evans","phone":"","email":"jenny@scottnet.co.za","unitId":"c3","checkIn":"2026-04-09","checkOut":"2026-04-12","source":"Honory rangers weekend","totalPrice":"1200","depositPaid":false,"depositAmount":"","paidInFull":true,"notes":""},{"id":"b004","firstName":"Jenny","lastName":"Evans","phone":"","email":"","unitId":"c4","checkIn":"2026-04-09","checkOut":"2026-04-12","source":"Honory rangers weekend","totalPrice":"1200","depositPaid":false,"depositAmount":"","paidInFull":true,"notes":""},{"id":"b005","firstName":"Yvette","lastName":"Penfold","phone":"","email":"penfoldyvette60@gmail.com","unitId":"r4","checkIn":"2026-04-09","checkOut":"2026-04-10","source":"Direct","totalPrice":"1200","depositPaid":false,"depositAmount":"","paidInFull":true,"notes":""},{"id":"b006","firstName":"Jenny","lastName":"Williamson","phone":"0829013390","email":"jnywil@gmail.com","unitId":"r1","checkIn":"2026-04-17","checkOut":"2026-04-19","source":"Direct","totalPrice":"1700","depositPaid":false,"depositAmount":"","paidInFull":true,"notes":"Camera club"},{"id":"b007","firstName":"Rene","lastName":"Scheepers","phone":"0820445970","email":"","unitId":"r5","checkIn":"2026-04-17","checkOut":"2026-04-19","source":"Direct","totalPrice":"5400","depositPaid":false,"depositAmount":"","paidInFull":true,"notes":"Camera club 2 rooms"},{"id":"b008","firstName":"Rene","lastName":"Scheepers","phone":"0820445970","email":"","unitId":"r3","checkIn":"2026-04-17","checkOut":"2026-04-19","source":"Direct","totalPrice":"0","depositPaid":false,"depositAmount":"","paidInFull":true,"notes":"Camera club 2 rooms"},{"id":"b009","firstName":"Marita","lastName":"Dempers","phone":"","email":"marita.dempers@gmail.com","unitId":"c1","checkIn":"2026-04-17","checkOut":"2026-04-24","source":"Direct","totalPrice":"2800","depositPaid":false,"depositAmount":"","paidInFull":true,"notes":"Camera club"},{"id":"b010","firstName":"Heepko","lastName":"Van Kaam","phone":"0826060473","email":"heepko@lantic.net","unitId":"c2","checkIn":"2026-04-17","checkOut":"2026-04-19","source":"Direct","totalPrice":"800","depositPaid":false,"depositAmount":"","paidInFull":true,"notes":"Camera club"},{"id":"b011","firstName":"Nelia","lastName":"Grundling","phone":"0832636550","email":"","unitId":"c4","checkIn":"2026-04-17","checkOut":"2026-04-24","source":"Direct","totalPrice":"3500","depositPaid":false,"depositAmount":"","paidInFull":true,"notes":"Wheel chair friendly. Nelia plus another lady"},{"id":"b012","firstName":"Lomie","lastName":"Smith","phone":"","email":"","unitId":"c3","checkIn":"2026-04-17","checkOut":"2026-04-19","source":"Direct","totalPrice":"800","depositPaid":false,"depositAmount":"","paidInFull":true,"notes":"Camera club organiser"},{"id":"b013","firstName":"Mark","lastName":"Graham","phone":"0832923440","email":"","unitId":"c2","checkIn":"2026-04-21","checkOut":"2026-04-25","source":"Repeat","totalPrice":"1200","depositPaid":false,"depositAmount":"","paidInFull":true,"notes":""},{"id":"b014","firstName":"Denis","lastName":"Goffinet","phone":"0791909865","email":"","unitId":"r4","checkIn":"2026-04-22","checkOut":"2026-04-23","source":"Swop and stay","totalPrice":"0","depositPaid":false,"depositAmount":"","paidInFull":true,"notes":"Guests names Lyn Lambert and sister"},{"id":"b015","firstName":"Lorraine","lastName":"Van rensburg","phone":"","email":"","unitId":"c1","checkIn":"2026-04-24","checkOut":"2026-04-26","source":"Direct","totalPrice":"1800","depositPaid":false,"depositAmount":"","paidInFull":true,"notes":"4 adults 2 rooftop tents"},{"id":"b016","firstName":"Gustav","lastName":"Schult","phone":"0839787328","email":"gustavschult@gmail.com","unitId":"c4","checkIn":"2026-04-24","checkOut":"2026-04-27","source":"CampLivSA","totalPrice":"1800","depositPaid":false,"depositAmount":"","paidInFull":true,"notes":"Caravan SA"},{"id":"b017","firstName":"Heidi","lastName":"Palmboom","phone":"","email":"","unitId":"r4","checkIn":"2026-04-27","checkOut":"2026-04-28","source":"Swop and stay","totalPrice":"0","depositPaid":false,"depositAmount":"","paidInFull":true,"notes":"ANSTYS BACKPACKERS"},{"id":"b018","firstName":"Helen","lastName":"Taylor","phone":"0833075402","email":"","unitId":"c1","checkIn":"2026-05-01","checkOut":"2026-05-04","source":"Direct","totalPrice":"1800","depositPaid":true,"depositAmount":"900","paidInFull":false,"notes":""},{"id":"b019","firstName":"Peter","lastName":"Odermatt","phone":"+31630031067","email":"poderm.664161@guest.booking.com","unitId":"r1","checkIn":"2026-05-10","checkOut":"2026-05-11","source":"Booking.com","totalPrice":"1147.50","depositPaid":false,"depositAmount":"","paidInFull":false,"notes":"Due R1147.50 vc 3 may. Dutch"},{"id":"b020","firstName":"Geoff","lastName":"Crane","phone":"","email":"","unitId":"r1","checkIn":"2026-05-14","checkOut":"2026-05-15","source":"Repeat","totalPrice":"0","depositPaid":false,"depositAmount":"","paidInFull":true,"notes":"Room 1 x 1"},{"id":"b021","firstName":"Geoff","lastName":"Crane","phone":"","email":"","unitId":"r2","checkIn":"2026-05-14","checkOut":"2026-05-15","source":"Repeat","totalPrice":"0","depositPaid":false,"depositAmount":"","paidInFull":true,"notes":"Room 2 x 2 pax"},{"id":"b022","firstName":"Geoff","lastName":"Crane","phone":"","email":"","unitId":"r3","checkIn":"2026-05-14","checkOut":"2026-05-15","source":"Repeat","totalPrice":"0","depositPaid":false,"depositAmount":"","paidInFull":true,"notes":"Room 3 x 1 pax"},{"id":"b023","firstName":"Geoff","lastName":"Crane","phone":"","email":"","unitId":"r4","checkIn":"2026-05-14","checkOut":"2026-05-15","source":"Repeat","totalPrice":"0","depositPaid":false,"depositAmount":"","paidInFull":true,"notes":"Room 4 x 1 pax"},{"id":"b024","firstName":"Joshua","lastName":"Stone","phone":"+14104767870","email":"jstone.66374@guest.booking.com","unitId":"r1","checkIn":"2026-05-15","checkOut":"2026-05-16","source":"Booking.com","totalPrice":"1950.75","depositPaid":false,"depositAmount":"","paidInFull":false,"notes":"R1950.75 due 8 may vc. Arrive 7-8pm. USA"},{"id":"b025","firstName":"Joshua","lastName":"Stone","phone":"","email":"","unitId":"r3","checkIn":"2026-05-15","checkOut":"2026-05-16","source":"Booking.com","totalPrice":"0","depositPaid":false,"depositAmount":"","paidInFull":false,"notes":"2 rooms 3 pax USA"},{"id":"b026","firstName":"Gerald","lastName":"Van Der Merwe","phone":"","email":"","unitId":"r5","checkIn":"2026-06-26","checkOut":"2026-06-28","source":"Direct","totalPrice":"4000","depositPaid":false,"depositAmount":"","paidInFull":true,"notes":"Includes 2x breakfast. Newcastle"},{"id":"b027","firstName":"Melaney","lastName":"Smith","phone":"0834109387","email":"msmith.381197@guest.booking.com","unitId":"r1","checkIn":"2026-06-26","checkOut":"2026-06-29","source":"Booking.com","totalPrice":"10212.75","depositPaid":false,"depositAmount":"","paidInFull":false,"notes":"Vc 19 june. 4 rooms R10212.75"},{"id":"b028","firstName":"Melaney","lastName":"Smith","phone":"","email":"","unitId":"r2","checkIn":"2026-06-26","checkOut":"2026-06-29","source":"Direct","totalPrice":"0","depositPaid":false,"depositAmount":"","paidInFull":false,"notes":""},{"id":"b029","firstName":"Melaney","lastName":"Smith","phone":"","email":"","unitId":"r3","checkIn":"2026-06-26","checkOut":"2026-06-29","source":"Direct","totalPrice":"0","depositPaid":false,"depositAmount":"","paidInFull":false,"notes":""},{"id":"b030","firstName":"Melaney","lastName":"Smith","phone":"","email":"","unitId":"r4","checkIn":"2026-06-26","checkOut":"2026-06-29","source":"Booking.com","totalPrice":"0","depositPaid":false,"depositAmount":"","paidInFull":false,"notes":""},{"id":"b031","firstName":"Felicity","lastName":"GowerJackson","phone":"0723732323","email":"","unitId":"c1","checkIn":"2026-06-27","checkOut":"2026-06-28","source":"Direct","totalPrice":"400","depositPaid":false,"depositAmount":"","paidInFull":true,"notes":""},{"id":"b032","firstName":"Tjaart","lastName":"Kruger","phone":"","email":"tnkruger@outlook.com","unitId":"c1","checkIn":"2026-07-02","checkOut":"2026-07-05","source":"Direct","totalPrice":"1200","depositPaid":false,"depositAmount":"","paidInFull":true,"notes":"Family join for 2 days"},{"id":"b033","firstName":"Jeffrey","lastName":"Ed","phone":"0835168106","email":"jed.575686@guest.booking.com","unitId":"r2","checkIn":"2026-07-02","checkOut":"2026-07-03","source":"Booking.com","totalPrice":"2970","depositPaid":false,"depositAmount":"","paidInFull":false,"notes":"3 rooms 6 pax"},{"id":"b034","firstName":"Jeffrey","lastName":"Ed","phone":"","email":"","unitId":"r3","checkIn":"2026-07-02","checkOut":"2026-07-03","source":"Booking.com","totalPrice":"0","depositPaid":false,"depositAmount":"","paidInFull":false,"notes":"3 rooms 6 pax"},{"id":"b035","firstName":"Jeffrey","lastName":"Ed","phone":"","email":"","unitId":"r4","checkIn":"2026-07-02","checkOut":"2026-07-03","source":"Booking.com","totalPrice":"0","depositPaid":false,"depositAmount":"","paidInFull":false,"notes":"Children 10 and 14"},{"id":"b036","firstName":"Tjaart","lastName":"Kruger","phone":"","email":"tnkruger@outlook.com","unitId":"c2","checkIn":"2026-07-03","checkOut":"2026-07-05","source":"Direct","totalPrice":"800","depositPaid":false,"depositAmount":"","paidInFull":true,"notes":"Joining parents"},{"id":"b037","firstName":"Thomas & Claudia","lastName":"Muller","phone":"","email":"muelli.t@icloud.com","unitId":"c1","checkIn":"2026-07-13","checkOut":"2026-07-14","source":"Direct","totalPrice":"600","depositPaid":false,"depositAmount":"","paidInFull":true,"notes":"Switzerland with kids and rooftop tent"},{"id":"b038","firstName":"Renette","lastName":"Kirsten","phone":"0827704627","email":"rkirst.204793@guest.booking.com","unitId":"r1","checkIn":"2026-07-24","checkOut":"2026-07-26","source":"Booking.com","totalPrice":"1683","depositPaid":false,"depositAmount":"","paidInFull":false,"notes":"Vc 17 July. Springs"},{"id":"b039","firstName":"Gavin","lastName":"Ball","phone":"0828052411","email":"gball.314246@guest.booking.com","unitId":"r4","checkIn":"2026-07-24","checkOut":"2026-07-26","source":"Booking.com","totalPrice":"1683","depositPaid":false,"depositAmount":"","paidInFull":false,"notes":"Vc 17 july"},{"id":"b040","firstName":"Amanda","lastName":"Lourens","phone":"0828051711","email":"lamand.139839@guest.booking.com","unitId":"r2","checkIn":"2026-07-24","checkOut":"2026-07-26","source":"Booking.com","totalPrice":"1782","depositPaid":false,"depositAmount":"","paidInFull":false,"notes":"Vc 17 july"},{"id":"b041","firstName":"Monica","lastName":"Van breede","phone":"0833070076","email":"vmonic.751099@guest.booking.com","unitId":"r3","checkIn":"2026-07-24","checkOut":"2026-07-26","source":"Booking.com","totalPrice":"1683","depositPaid":false,"depositAmount":"","paidInFull":false,"notes":"Vc 17 july"},{"id":"b042","firstName":"Craig","lastName":"Ek","phone":"0835516608","email":"craig.ek@secosa.co.za","unitId":"r5","checkIn":"2026-07-24","checkOut":"2026-07-26","source":"Direct","totalPrice":"2800","depositPaid":false,"depositAmount":"","paidInFull":true,"notes":""},{"id":"b043","firstName":"Ellen & Alan","lastName":"Russel","phone":"0828880040","email":"","unitId":"c3","checkIn":"2026-07-24","checkOut":"2026-07-27","source":"Direct","totalPrice":"1200","depositPaid":false,"depositAmount":"","paidInFull":false,"notes":""},{"id":"b044","firstName":"Frans","lastName":"Van hoogstraten","phone":"","email":"","unitId":"c1","checkIn":"2026-08-22","checkOut":"2026-08-23","source":"Direct","totalPrice":"400","depositPaid":false,"depositAmount":"","paidInFull":false,"notes":""},{"id":"b045","firstName":"Penny","lastName":"Bateman","phone":"+34609623492","email":"bpenny.518576@guest.booking.com","unitId":"r5","checkIn":"2026-09-10","checkOut":"2026-09-13","source":"Booking.com","totalPrice":"3750","depositPaid":false,"depositAmount":"","paidInFull":false,"notes":"Vc 3 sept"},{"id":"b046","firstName":"Ilze","lastName":"Loots","phone":"0842292904","email":"","unitId":"c4","checkIn":"2026-09-17","checkOut":"2026-09-18","source":"Direct","totalPrice":"400","depositPaid":false,"depositAmount":"","paidInFull":true,"notes":""},{"id":"b047","firstName":"Mcrs","lastName":"","phone":"","email":"","unitId":"c1","checkIn":"2026-10-23","checkOut":"2026-10-25","source":"Repeat","totalPrice":"0","depositPaid":false,"depositAmount":"","paidInFull":false,"notes":"History weekend"},{"id":"b048","firstName":"Mcrs","lastName":"","phone":"","email":"","unitId":"c2","checkIn":"2026-10-23","checkOut":"2026-10-25","source":"Repeat","totalPrice":"0","depositPaid":false,"depositAmount":"","paidInFull":false,"notes":""},{"id":"b049","firstName":"Mcrs","lastName":"","phone":"","email":"","unitId":"c3","checkIn":"2026-10-23","checkOut":"2026-10-25","source":"Repeat","totalPrice":"0","depositPaid":false,"depositAmount":"","paidInFull":false,"notes":""},{"id":"b050","firstName":"Mcrs","lastName":"","phone":"","email":"","unitId":"c4","checkIn":"2026-10-23","checkOut":"2026-10-25","source":"Repeat","totalPrice":"0","depositPaid":false,"depositAmount":"","paidInFull":false,"notes":""},{"id":"b051","firstName":"Lara","lastName":"De Matos","phone":"0824632944","email":"","unitId":"r5","checkIn":"2026-11-13","checkOut":"2026-11-15","source":"Repeat","totalPrice":"2400","depositPaid":false,"depositAmount":"","paidInFull":false,"notes":"Birthday weekend"},{"id":"b052","firstName":"Leslie","lastName":"Correa","phone":"","email":"leslie.correia@gmail.com","unitId":"c1","checkIn":"2027-01-03","checkOut":"2027-01-06","source":"Direct","totalPrice":"2100","depositPaid":false,"depositAmount":"","paidInFull":false,"notes":"5 pax R700 x 3"}];
+const SEED=[{"id":"b001","firstName":"Neil","lastName":"Grant","phone":"0761129021","email":"","unitId":"c1","checkIn":"2026-04-08","checkOut":"2026-04-10","source":"Walkin","totalPrice":"600","depositPaid":false,"depositAmount":"","paidInFull":true,"notes":"Tent on site 2"},{"id":"b002","firstName":"Alain","lastName":"Hocepied","phone":"0782334095","email":"ahocep.936833@guest.booking.com","unitId":"r5","checkIn":"2026-04-09","checkOut":"2026-04-11","source":"Booking.com","totalPrice":"2520","depositPaid":false,"depositAmount":"","paidInFull":true,"notes":"Arrive between 2 and 4pm"}];
 
 loadBookings();
 if(bookings.length===0){bookings=SEED;saveBookings();}
